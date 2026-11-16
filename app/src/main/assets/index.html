@@ -6,7 +6,9 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Trebuchet MS","Segoe UI",Roboto,Arial,sans-serif;background:#0f172a;color:#f1f5f9;-webkit-tap-highlight-color:transparent}
-button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+#parent .btn:active,#modal .btn:active,.tog:active,.chips button:active,.tabs button:active,.seg button:active{opacity:.6}
+.saving{color:#94a3b8;font-size:13px;padding:0 6px}
 .hidden{display:none!important}
 .money{font-variant-numeric:tabular-nums}
 
@@ -353,9 +355,12 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function startParent() {
   document.getElementById('parent').className = '';
   var saved = lsGet('chorePin');
+  var cached = null;
+  try { cached = JSON.parse(lsGet('choreState') || 'null'); } catch (x) {}
+  if (saved && cached && cached.kids) { PIN = saved; S = cached; renderParent(); }   // show last screen instantly
   if (saved) {
-    call('parent', saved, 'check').then(function (st) { PIN = saved; S = st; renderParent(); })
-      .catch(function () { showPin(); });
+    call('parent', saved, 'check').then(function (st) { PIN = saved; lastJson = ''; applyState(st); cacheState(); })
+      .catch(function (e) { if (!S || /PIN/.test(errMsg(e))) showPin(); else toast(errMsg(e)); });
   } else showPin();
   setInterval(function () { if (PIN && document.getElementById('modal').className === 'hidden') refresh(); }, 30000);
 }
@@ -374,11 +379,31 @@ function showPin(msg) {
   document.getElementById('pin').onkeydown = function (e) { if (e.key === 'Enter') go(); };
 }
 
-function act(action, args, okMsg) {
-  busy = true;
-  return call('parent', PIN, action, args || {}).then(function (st) {
-    S = st; busy = false; closeModal(); renderParent(); if (okMsg) toast(okMsg, true);
-  }).catch(function (e) { busy = false; toast(errMsg(e)); if (/PIN/.test(errMsg(e))) { lsSet('chorePin', ''); showPin(); } });
+function cacheState() { if (S) lsSet('choreState', JSON.stringify(S)); }
+function round2(n) { return Math.round(n * 100) / 100; }
+function runsOn(days, dow) {
+  days = String(days || 'daily');
+  return days.toLowerCase() === 'daily' || days.split(/[\s,]+/).indexOf(DAYS[dow]) >= 0;
+}
+function serverFail(e) {
+  toast(errMsg(e));
+  if (/PIN/.test(errMsg(e))) { lsSet('chorePin', ''); showPin(); return; }
+  refresh(true);                            // put the screen back to what Google really has
+}
+// Update the screen right away (local), then save to Google in the background
+function act(action, args, okMsg, local) {
+  args = args || {};
+  if (local) {
+    try { local(); } catch (x) {}
+    closeModal(); renderParent(); cacheState();
+    if (okMsg) toast(okMsg, true);
+  } else busy = true;
+  pending++;
+  return call('parent', PIN, action, args).then(function (st) {
+    pending--; busy = false;
+    if (!local) { closeModal(); if (okMsg) toast(okMsg, true); }
+    if (pending === 0) { lastJson = ''; applyState(st); cacheState(); }
+  }).catch(function (e) { pending--; busy = false; serverFail(e); });
 }
 
 function kidById(id) { return S.kids.filter(function (k) { return k.id === id; })[0]; }
@@ -428,7 +453,8 @@ function viewChores() {
     k.chores.forEach(function (c) {
       h += '<div class="li' + (c.active ? '' : ' off') + '"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) +
         '<small>' + money(c.value) + ' · ' + daysLabel(c.days) + (c.active ? '' : ' · paused') + '</small></span>' +
-        '<button class="btn" data-act="editChore" data-kid="' + k.id + '" data-id="' + c.id + '">Edit</button></div>';
+        (String(c.id).indexOf('tmp') === 0 ? '<span class="saving">Saving…</span>' :
+        '<button class="btn" data-act="editChore" data-kid="' + k.id + '" data-id="' + c.id + '">Edit</button>') + '</div>';
     });
     h += '</div>';
   });
@@ -507,9 +533,17 @@ function doMoney(kind, kidId) {
   var bucket = document.querySelector('#seg button.on').dataset.v;
   if (!amt) { toast('Enter an amount'); return; }
   var k = kidById(kidId);
-  if (kind === 'move') return act('move', {kidId: kidId, to: bucket, amount: amt, note: note}, 'Moved ' + money(amt));
+  if (kind === 'move') return act('move', {kidId: kidId, to: bucket, amount: amt, note: note}, 'Moved ' + money(amt), function () {
+    var from = bucket === 'spending' ? 'savings' : 'spending';
+    k[from] = round2(k[from] - amt); k[bucket] = round2(k[bucket] + amt);
+    S.ledger.unshift({ts: new Date().toISOString(), kidId: kidId, type: 'move', savings: bucket === 'savings' ? amt : -amt, spending: bucket === 'spending' ? amt : -amt, note: note || 'Moved money'});
+  });
   if (kind === 'spend' && amt > k[bucket] + 0.001 && !confirm(k.name + ' only has ' + money(k[bucket]) + ' in ' + bucket + '. Go negative anyway?')) return;
-  act('txn', {kidId: kidId, bucket: bucket, amount: kind === 'spend' ? -amt : amt, note: note || (kind === 'spend' ? 'Spent' : 'Bonus'), type: kind}, 'Saved');
+  var signed = kind === 'spend' ? -amt : amt, nt = note || (kind === 'spend' ? 'Spent' : 'Bonus');
+  act('txn', {kidId: kidId, bucket: bucket, amount: signed, note: nt, type: kind}, 'Saved', function () {
+    k[bucket] = round2(k[bucket] + signed);
+    S.ledger.unshift({ts: new Date().toISOString(), kidId: kidId, type: kind, savings: bucket === 'savings' ? signed : 0, spending: bucket === 'spending' ? signed : 0, note: nt});
+  });
 }
 
 function todayModal(kidId) {
@@ -562,12 +596,26 @@ document.addEventListener('click', function (e) {
     case 'doMoney': doMoney(t.dataset.kind, kid); break;
     case 'today': todayModal(kid); break;
     case 'ptoggle':
-      busy = true;
-      call('parent', PIN, 'toggle', {kidId: kid, choreId: id}).then(function (st) { S = st; busy = false; renderParent(); todayModal(kid); })
-        .catch(function (err) { busy = false; toast(errMsg(err)); });
+      var pk = kidById(kid), pc = pk.chores.filter(function (x) { return x.id === id; })[0];
+      if (!pc) break;
+      pc.done = !pc.done;
+      pk.pending = round2(pk.pending + (pc.done ? pc.value : -pc.value));
+      todayModal(kid); renderParent(); cacheState();
+      pending++;
+      call('parent', PIN, 'toggle', {kidId: kid, choreId: id}).then(function (st) {
+        pending--; if (pending === 0) { lastJson = ''; applyState(st); cacheState(); if (document.getElementById('modal').className !== 'hidden') todayModal(kid); }
+      }).catch(function (err) { pending--; serverFail(err); });
       break;
     case 'payday':
-      if (confirm('Pay out everything earned this week now? It will split into Savings and Spending.')) act('payday', {}, 'Paid out!');
+      if (confirm('Pay out everything earned this week now? It will split into Savings and Spending.')) act('payday', {}, 'Paid out!', function () {
+        S.kids.forEach(function (pk2) {
+          if (pk2.pending <= 0) return;
+          var sv = round2(pk2.pending * pk2.savingsPct / 100), sp = round2(pk2.pending - sv);
+          pk2.savings = round2(pk2.savings + sv); pk2.spending = round2(pk2.spending + sp);
+          S.ledger.unshift({ts: new Date().toISOString(), kidId: pk2.id, type: 'payday', savings: sv, spending: sp, note: 'Pay day: ' + money(pk2.pending)});
+          pk2.pending = 0;
+        });
+      });
       break;
     case 'newChore': choreModal(kid); break;
     case 'editChore': choreModal(kid, id); break;
@@ -581,32 +629,45 @@ document.addEventListener('click', function (e) {
       if (!name) { toast('Give the chore a name'); return; }
       if (!editDays.length) { toast('Pick at least one day'); return; }
       var days = editDays.length === 7 ? 'daily' : DAYS.filter(function (x) { return editDays.indexOf(x) >= 0; }).join(',');
-      act('saveChore', {id: id || '', kidId: kid, name: name, icon: document.getElementById('cIcon').value.trim() || '⭐',
-        value: parseFloat(document.getElementById('cVal').value) || 0, days: days, active: document.getElementById('cAct').checked}, 'Chore saved');
+      var ch = {id: id || '', kidId: kid, name: name, icon: document.getElementById('cIcon').value.trim() || '⭐',
+        value: round2(parseFloat(document.getElementById('cVal').value) || 0), days: days, active: document.getElementById('cAct').checked};
+      act('saveChore', ch, 'Chore saved', function () {
+        var sk = kidById(kid);
+        var ex = id ? sk.chores.filter(function (x) { return x.id === id; })[0] : null;
+        var rec = ex || {id: 'tmp' + Date.now(), done: false};
+        rec.name = ch.name; rec.icon = ch.icon; rec.value = ch.value; rec.days = ch.days; rec.active = ch.active;
+        rec.today = ch.active && runsOn(ch.days, S.dow);
+        if (!ex) sk.chores.push(rec);
+      });
       break;
     case 'delChore':
-      if (confirm('Delete this chore? (Money already earned stays.)')) act('deleteChore', {id: id}, 'Deleted');
+      if (confirm('Delete this chore? (Money already earned stays.)')) act('deleteChore', {id: id}, 'Deleted', function () {
+        S.kids.forEach(function (dk) { dk.chores = dk.chores.filter(function (x) { return x.id !== id; }); });
+      });
       break;
     case 'savePct':
       var inputs = document.querySelectorAll('[data-pct]');
-      var chain = Promise.resolve();
-      busy = true;
+      var chain = Promise.resolve(), last = null;
       Array.prototype.forEach.call(inputs, function (inp) {
+        var sk = kidById(inp.dataset.pct); if (sk) sk.savingsPct = Number(inp.value);
         chain = chain.then(function () { return call('parent', PIN, 'saveKid', {id: inp.dataset.pct, savingsPct: inp.value}); })
-          .then(function (st) { S = st; });
+          .then(function (st) { last = st; });
       });
-      chain.then(function () { busy = false; renderParent(); toast('Savings split saved', true); })
-        .catch(function (err) { busy = false; toast(errMsg(err)); });
+      renderParent(); cacheState(); toast('Savings split saved', true);
+      pending++;
+      chain.then(function () { pending--; if (pending === 0 && last) { lastJson = ''; applyState(last); cacheState(); } })
+        .catch(function (err) { pending--; serverFail(err); });
       break;
     case 'savePayday':
-      act('setPayday', {day: +document.getElementById('pdDay').value, hour: +document.getElementById('pdHour').value}, 'Pay day saved');
+      var pdd = +document.getElementById('pdDay').value, pdh = +document.getElementById('pdHour').value;
+      act('setPayday', {day: pdd, hour: pdh}, 'Pay day saved', function () { S.settings.paydayDay = pdd; S.settings.paydayHour = pdh; });
       break;
     case 'savePin':
       var np = document.getElementById('newPin').value;
       call('parent', PIN, 'setPin', {newPin: np}).then(function (st) { PIN = np; lsSet('chorePin', np); S = st; renderParent(); toast('PIN changed', true); })
         .catch(function (err) { toast(errMsg(err)); });
       break;
-    case 'lock': PIN = null; lsSet('chorePin', ''); showPin(); break;
+    case 'lock': PIN = null; lsSet('chorePin', ''); lsSet('choreState', ''); showPin(); break;
     case 'tvview': openTvView(); break;
     case 'close': closeModal(); break;
   }
