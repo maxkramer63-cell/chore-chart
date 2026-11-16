@@ -2,7 +2,7 @@
 
 Family chore chart for the Fire TV, with a parent view for phones.
 
-- `apps-script/Code.gs` is the backend. Paste it into script.google.com, run `setup`, then deploy it as a web app (Execute as: Me, Access: Anyone).
+- The backend is a single Code.gs file (kept out of this public repo). Paste it into script.google.com, run `setup`, then deploy it as a web app (Execute as: Me, Access: Anyone).
 - `app/` is the Fire TV app. Every push to `main` builds a signed APK and publishes it under Releases.
 
 ## Setup
