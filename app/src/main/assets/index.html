@@ -107,7 +107,8 @@ input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #475569
 .chips button{padding:8px 10px;border-radius:8px;background:#334155;font-size:14px;font-weight:bold}
 .chips button.on{background:#0ea5e9;color:#fff}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:40}
-#modal .sheet{background:#1e293b;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px 26px;max-height:90vh;overflow:auto}
+#modal .sheet{background:#1e293b;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px 0;max-height:94%;overflow:auto}
+#modal .sheet>.btns:last-child,#modal .sheet>.btn.full:last-child{position:sticky;bottom:0;background:#1e293b;padding:12px 0 18px;margin-top:12px;z-index:2}
 #modal h3{font-size:19px;margin-bottom:4px}
 .pinbox{max-width:320px;margin:15vh auto;text-align:center}
 .pinbox input{text-align:center;font-size:28px;letter-spacing:10px;margin:16px 0}
@@ -591,6 +592,11 @@ document.addEventListener('click', function (e) {
     case 'tvview': openTvView(); break;
     case 'close': closeModal(); break;
   }
+});
+// keep the box you're typing in visible above the phone keyboard
+document.addEventListener('focusin', function (e) {
+  if (MODE !== 'parent' || !/INPUT|SELECT/.test(e.target.tagName)) return;
+  setTimeout(function () { try { e.target.scrollIntoView({block: 'center', behavior: 'smooth'}); } catch (x) {} }, 350);
 });
 document.addEventListener('input', function (e) {
   if (e.target.dataset && e.target.dataset.pct) document.getElementById('pv_' + e.target.dataset.pct).textContent = e.target.value;
