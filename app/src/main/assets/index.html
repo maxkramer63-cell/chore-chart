@@ -444,8 +444,65 @@ function viewKids() {
   return h;
 }
 
+var PRESET = {
+  addison: [['Make bed','🛏️',0.10,'daily'],['Unload dishwasher','🍽️',0.25,'daily'],['Clear & wipe table after supper','🧽',0.25,'daily'],
+    ['Feed & water the pets','🐶',0.15,'daily'],['Read 20 minutes','📚',0.15,'daily'],['Clean room','🧹',1.00,'Sa'],
+    ['Trash & recycling to the curb','🗑️',0.50,'Mo'],['Fold & put away laundry','👕',0.50,'We,Sa'],['Wipe bathroom sink & mirror','🚽',0.75,'Sa'],
+    ['Help make supper','🍳',0.75,'Su']],
+  maximus: [['Make bed','🛏️',0.10,'daily'],['Dirty clothes in hamper','🧺',0.10,'daily'],['Set the table','🍴',0.20,'daily'],
+    ['Pick up room','🧸',0.15,'daily'],['Read 15 minutes','📚',0.15,'daily'],['Empty small trash cans','🗑️',0.50,'Tu'],
+    ['Put away laundry','🧦',0.50,'Sa'],['Vacuum room','🧹',0.75,'Sa'],['Help outside or in the garage','🚗',0.75,'Sa']],
+  emery: [['Put toys away','🧸',0.10,'daily'],['Help make bed','🛏️',0.10,'daily'],['Clothes in hamper','🧦',0.05,'daily'],
+    ['Plate to the sink','🍽️',0.05,'daily'],['Brush teeth','🪥',0.05,'daily'],['Match socks','🧦',0.25,'Sa'],
+    ['Dust with a sock on your hand','🧹',0.25,'Sa'],['Water the plants','🌱',0.25,'We']]
+};
+
+// Replace every kid's chores with the recommended list (runs a few saves at a time)
+function loadPreset() {
+  var jobs = [];
+  S.kids.forEach(function (k) {
+    k.chores.forEach(function (c) { if (String(c.id).indexOf('tmp') !== 0) jobs.push(['deleteChore', {id: c.id}]); });
+    var list = PRESET[k.id] || [];
+    k.chores = list.map(function (p, i) {
+      return {id: 'tmp' + k.id + i, name: p[0], icon: p[1], value: p[2], days: p[3], active: true, done: false, today: runsOn(p[3], S.dow)};
+    });
+    list.forEach(function (p, i) {
+      jobs.push(['saveChore', {kidId: k.id, name: p[0], icon: p[1], value: p[2], days: p[3], active: true, order: 0}]);
+    });
+  });
+  // keep each kid's order stable: number orders by kid position then row
+  var n = 0; jobs.forEach(function (j) { if (j[0] === 'saveChore') j[1].order = ++n; });
+  renderParent(); cacheState();
+  var total = jobs.length, doneCount = 0, failed = 0, last = null;
+  pending++;
+  toast('Saving chores… 0 of ' + total, true);
+  // deletes first, then adds, 4 at a time
+  var deletes = jobs.filter(function (j) { return j[0] === 'deleteChore'; });
+  var adds = jobs.filter(function (j) { return j[0] === 'saveChore'; });
+  function runBatch(list) {
+    return new Promise(function (resolve) {
+      var i = 0, active = 0;
+      function next() {
+        if (i >= list.length && active === 0) return resolve();
+        while (active < 4 && i < list.length) {
+          var j = list[i++]; active++;
+          call('parent', PIN, j[0], j[1]).then(function (st) { last = st; })
+            .catch(function () { failed++; })
+            .then(function () { active--; doneCount++; toast('Saving chores… ' + doneCount + ' of ' + total, true); next(); });
+        }
+      }
+      next();
+    });
+  }
+  runBatch(deletes).then(function () { return runBatch(adds); }).then(function () {
+    pending--;
+    if (failed) toast(failed + ' chore changes didn’t save — tap the button again'); else toast('All chores loaded ⭐', true);
+    lastJson = ''; refresh(true);
+  });
+}
+
 function viewChores() {
-  var h = '';
+  var h = '<button class="btn grn full" data-act="preset" style="margin-bottom:12px">⭐ Load recommended chore list</button>';
   S.kids.forEach(function (k) {
     h += '<div class="card" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) +
       '<button class="btn pri" data-act="newChore" data-kid="' + k.id + '">+ Add</button></h2>';
@@ -669,6 +726,9 @@ document.addEventListener('click', function (e) {
       break;
     case 'lock': PIN = null; lsSet('chorePin', ''); lsSet('choreState', ''); showPin(); break;
     case 'tvview': openTvView(); break;
+    case 'preset':
+      if (confirm('Replace ALL current chores for every kid with the recommended list? Money already earned stays.')) loadPreset();
+      break;
     case 'close': closeModal(); break;
   }
 });
