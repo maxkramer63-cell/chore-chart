@@ -1,10 +1,14 @@
 package com.family.chorechart;
 
 import android.app.Activity;
+import android.app.UiModeManager;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -23,12 +27,14 @@ import java.util.concurrent.Executors;
 /** Full-screen TV app: shows the chore board and talks to the family's Google Apps Script backend. */
 public class MainActivity extends Activity {
     private WebView web;
+    private boolean isTv;
     private final ExecutorService pool = Executors.newFixedThreadPool(2);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        isTv = detectTv();
+        if (isTv) getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -36,12 +42,31 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(true);
         web.setBackgroundColor(0xFF0F172A);
         web.setWebViewClient(new WebViewClient());
+        web.setWebChromeClient(new WebChromeClient()); // lets confirm() pop-ups show
         web.addJavascriptInterface(new Bridge(), "Native");
         web.setFocusable(true);
         web.setFocusableInTouchMode(true);
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
         web.requestFocus(View.FOCUS_DOWN);
+    }
+
+    /** Fire TV / Android TV get the chore board; phones get parent mode. */
+    private boolean detectTv() {
+        PackageManager pm = getPackageManager();
+        UiModeManager ui = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+        if (ui != null && ui.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) return true;
+        if (pm.hasSystemFeature("amazon.hardware.fire_tv")) return true;
+        if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) return true;
+        return !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isTv || web == null) { super.onBackPressed(); return; }
+        // On phones, Back closes an open pop-up first
+        web.evaluateJavascript("(function(){var m=document.getElementById('modal');if(m&&m.className!=='hidden'){m.className='hidden';return 1}return 0})()",
+            v -> { if (!"1".equals(v)) finish(); });
     }
 
     @Override
@@ -63,6 +88,9 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public String version() { return BuildConfig.VERSION_NAME; }
+
+        @JavascriptInterface
+        public String mode() { return isTv ? "tv" : "parent"; }
 
         @JavascriptInterface
         public void call(final String id, final String fn, final String argsJson) {

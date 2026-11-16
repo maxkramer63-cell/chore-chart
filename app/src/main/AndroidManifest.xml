@@ -8,7 +8,7 @@
         android:label="Chore Chart"
         android:icon="@drawable/ic_launcher"
         android:banner="@drawable/banner"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:theme="@android:style/Theme.NoTitleBar"
         android:allowBackup="false">
         <activity
             android:name=".MainActivity"

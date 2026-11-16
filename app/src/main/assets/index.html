@@ -131,6 +131,7 @@ if (typeof google === 'undefined' && window.Native) {
     return o;
   }}};
 }
+  if (Native.mode) MODE = Native.mode();
 var S = null;                 // state from server
 var focus = {c: 0, r: 0};     // TV focus
 var busy = false;
