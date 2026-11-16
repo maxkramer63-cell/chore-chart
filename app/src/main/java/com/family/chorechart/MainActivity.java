@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (isTv || web == null) { super.onBackPressed(); return; }
         // On phones, Back closes an open pop-up first
-        web.evaluateJavascript("(function(){var m=document.getElementById('modal');if(m&&m.className!=='hidden'){m.className='hidden';return 1}return 0})()",
+        web.evaluateJavascript("(function(){var m=document.getElementById('modal');if(m&&m.className!=='hidden'){m.className='hidden';return 1}if(window.tvView){closeTvView();return 1}return 0})()",
             v -> { if (!"1".equals(v)) finish(); });
     }
 
