@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Trebuchet MS","Segoe UI",Roboto,Arial,sans-serif;background:#0f172a;color:#f1f5f9;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.hidden{display:none!important}
+.money{font-variant-numeric:tabular-nums}
+
+/* ================= TV ================= */
+#tv{height:100vh;display:flex;flex-direction:column;padding:1.6vw 2vw;gap:1.2vw;overflow:hidden;
+  background:radial-gradient(circle at 20% 0%,#1e293b 0,#0f172a 60%)}
+#tv header{display:flex;align-items:baseline;justify-content:space-between}
+#tv h1{font-size:2.6vw;letter-spacing:.02em}
+#tv .date{font-size:1.6vw;color:#94a3b8}
+#tv .hint{font-size:1.1vw;color:#64748b}
+.cols{flex:1;display:flex;gap:1.6vw;min-height:0}
+.col{flex:1;display:flex;flex-direction:column;background:#1e293b;border-radius:1.4vw;overflow:hidden;
+  border-top:.6vw solid var(--c);min-height:0}
+.col-head{padding:1vw 1.2vw .6vw;display:flex;justify-content:space-between;align-items:center}
+.col-head h2{font-size:2.3vw}
+.stars{font-size:1.5vw;letter-spacing:.1vw;text-align:right;line-height:1.2}
+.progress{font-size:1.1vw;color:#94a3b8;text-align:right}
+.list{flex:1;overflow:hidden;padding:.4vw 1vw;display:flex;flex-direction:column;gap:.7vw}
+.chore{display:flex;align-items:center;gap:1vw;padding:.8vw 1vw;border-radius:1vw;background:#334155;
+  border:.25vw solid transparent;transition:transform .12s,background .2s,border-color .12s;text-align:left;width:100%}
+.chore .ic{font-size:2.4vw;width:3vw;text-align:center}
+.chore .nm{flex:1;font-size:1.55vw;font-weight:bold;line-height:1.15}
+.chore .val{font-size:1.3vw;background:#0f172a;border-radius:2vw;padding:.25vw .8vw;color:#fde68a}
+.chore .ck{width:2.6vw;height:2.6vw;border-radius:50%;border:.25vw solid #94a3b8;display:flex;align-items:center;
+  justify-content:center;font-size:1.6vw;font-weight:bold}
+.chore.done{background:#14532d}
+.chore.done .nm{color:#bbf7d0}
+.chore.done .ck{background:#22c55e;border-color:#22c55e;color:#fff}
+.chore.focus{border-color:#fff;transform:scale(1.04);box-shadow:0 0 0 .3vw var(--c),0 .6vw 1.6vw rgba(0,0,0,.5);background:#475569}
+.chore.done.focus{background:#166534}
+.alldone{margin:0 1vw;padding:.7vw;border-radius:1vw;text-align:center;font-size:1.5vw;font-weight:bold;
+  background:linear-gradient(90deg,#f59e0b,#fde047,#f59e0b);color:#422006}
+.bank{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6vw;padding:1vw}
+.bank div{background:#0f172a;border-radius:.8vw;padding:.6vw .4vw;text-align:center}
+.bank small{display:block;font-size:.95vw;color:#94a3b8}
+.bank b{font-size:1.6vw}
+.bank .sv b{color:#86efac}.bank .sp b{color:#7dd3fc}.bank .wk b{color:#fde68a}
+.empty{color:#64748b;font-size:1.3vw;text-align:center;padding:2vw}
+
+/* celebration */
+#party{position:fixed;inset:0;background:rgba(15,23,42,.88);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;z-index:50;overflow:hidden}
+#party h3{font-size:5vw;color:#fde047;text-shadow:0 .3vw 0 #a16207;text-align:center;animation:pop .6s ease-out}
+#party p{font-size:2.2vw;margin-top:1vw;text-align:center}
+#party .big{font-size:9vw;animation:spin 2.4s ease-in-out infinite}
+.fall{position:absolute;top:-10vh;animation:fall linear forwards;pointer-events:none}
+@keyframes fall{to{transform:translateY(120vh) rotate(540deg)}}
+@keyframes pop{0%{transform:scale(.3)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes spin{0%,100%{transform:rotate(-12deg) scale(1)}50%{transform:rotate(12deg) scale(1.15)}}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:3vh;transform:translateX(-50%);background:#dc2626;color:#fff;padding:12px 20px;
+  border-radius:10px;font-size:16px;z-index:99;max-width:90vw;text-align:center}
+#toast.ok{background:#16a34a}
+
+/* ================= PARENT (phone) ================= */
+#parent{max-width:640px;margin:0 auto;padding:16px 14px 80px;font-size:16px}
+#parent h1{font-size:22px;margin-bottom:4px}
+.sub{color:#94a3b8;font-size:14px}
+.tabs{display:flex;gap:6px;margin:14px 0;position:sticky;top:0;background:#0f172a;padding:6px 0;z-index:5}
+.tabs button{flex:1;padding:10px 4px;border-radius:10px;background:#1e293b;font-weight:bold;font-size:14px}
+.tabs button.on{background:#0ea5e9;color:#fff}
+.card{background:#1e293b;border-radius:14px;padding:14px;margin-bottom:12px;border-left:6px solid var(--c,#0ea5e9)}
+.card h2{font-size:19px;display:flex;justify-content:space-between;align-items:center}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.row3 div{background:#0f172a;border-radius:10px;padding:8px;text-align:center}
+.row3 small{display:block;color:#94a3b8;font-size:12px}
+.row3 b{font-size:18px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:10px 14px;border-radius:10px;background:#334155;font-weight:bold;font-size:14px}
+.btn.pri{background:#0ea5e9;color:#fff}.btn.grn{background:#16a34a;color:#fff}.btn.red{background:#b91c1c;color:#fff}
+.btn.full{width:100%;padding:14px}
+.li{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #334155}
+.li:last-child{border-bottom:0}
+.li .ic{font-size:22px;width:28px;text-align:center}
+.li .nm{flex:1}
+.li .nm small{display:block;color:#94a3b8;font-size:12px}
+.tog{width:30px;height:30px;border-radius:50%;border:2px solid #94a3b8;font-weight:bold}
+.tog.on{background:#22c55e;border-color:#22c55e;color:#fff}
+.off{opacity:.45}
+.hist{font-size:14px}
+.hist .amt{text-align:right;white-space:nowrap}
+.pos{color:#86efac}.neg{color:#fca5a5}
+label{display:block;font-size:13px;color:#94a3b8;margin:10px 0 4px}
+input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#f1f5f9;font-size:16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{padding:8px 10px;border-radius:8px;background:#334155;font-size:14px;font-weight:bold}
+.chips button.on{background:#0ea5e9;color:#fff}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:40}
+#modal .sheet{background:#1e293b;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px 26px;max-height:90vh;overflow:auto}
+#modal h3{font-size:19px;margin-bottom:4px}
+.pinbox{max-width:320px;margin:15vh auto;text-align:center}
+.pinbox input{text-align:center;font-size:28px;letter-spacing:10px;margin:16px 0}
+.seg{display:flex;gap:6px}.seg button{flex:1;padding:10px;border-radius:10px;background:#334155;font-weight:bold}
+.seg button.on{background:#0ea5e9;color:#fff}
+.loading{text-align:center;color:#94a3b8;padding:30vh 0;font-size:20px}
+</style>
+</head>
+<body>
+<div id="loading" class="loading">Loading chores…</div>
+<div id="tv" class="hidden"></div>
+<div id="parent" class="hidden"></div>
+<div id="party" class="hidden"></div>
+<div id="modal" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+var MODE = '__MODE__';
+// Inside the Fire TV app there is no google.script.run, so route calls through the app's native bridge
+if (typeof google === 'undefined' && window.Native) {
+  var __cbs = {}, __n = 0;
+  window.__nativeCb = function (id, r) {
+    var c = __cbs[id]; delete __cbs[id]; if (!c) return;
+    if (r && r.ok) c.s(r.result); else c.f(new Error((r && r.error) || 'Network error'));
+  };
+  window.google = {script: {get run() {
+    var s = function () {}, f = function () {};
+    var o = {withSuccessHandler: function (x) { s = x; return o; }, withFailureHandler: function (x) { f = x; return o; }};
+    ['getState', 'toggleChore', 'parent'].forEach(function (n) {
+      o[n] = function () { var id = 'c' + (++__n); __cbs[id] = {s: s, f: f}; Native.call(id, n, JSON.stringify(Array.prototype.slice.call(arguments))); };
+    });
+    return o;
+  }}};
+}
+var S = null;                 // state from server
+var focus = {c: 0, r: 0};     // TV focus
+var busy = false;
+var DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// ---------- server bridge ----------
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (res, rej) {
+    var r = google.script.run.withSuccessHandler(res).withFailureHandler(function (e) { rej(e); });
+    r[fn].apply(r, args);
+  });
+}
+function money(n) { n = Number(n) || 0; return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function toast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.className = ok ? 'ok' : '';
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = 'hidden'; }, 3200);
+}
+function errMsg(e) { return (e && e.message ? e.message : String(e)).replace(/^Exception:\s*/, ''); }
+function todayChores(k) { return k.chores.filter(function (c) { return c.today; }); }
+function allDone(k) { var t = todayChores(k); return t.length > 0 && t.every(function (c) { return c.done; }); }
+function earnedToday(k) { return todayChores(k).filter(function (c) { return c.done; }).reduce(function (s, c) { return s + c.value; }, 0); }
+
+// ======================================================
+// TV
+// ======================================================
+function renderTV() {
+  var el = document.getElementById('tv');
+  var d = new Date();
+  var html = '<header><div><h1>⭐ Today\'s Chores</h1><div class="hint">Use ◀ ▶ ▲ ▼ to move · press OK to check off</div></div>' +
+    '<div class="date">' + DAY_NAMES[d.getDay()] + ', ' + d.toLocaleDateString(undefined, {month: 'long', day: 'numeric'}) + '</div></header><div class="cols">';
+  S.kids.forEach(function (k, ci) {
+    var list = todayChores(k);
+    var n = list.filter(function (c) { return c.done; }).length;
+    var stars = list.map(function (c) { return c.done ? '⭐' : '☆'; }).join('');
+    html += '<section class="col" style="--c:' + esc(k.color) + '"><div class="col-head"><h2>' + esc(k.name) + '</h2>' +
+      '<div><div class="stars">' + stars + '</div><div class="progress">' + n + ' of ' + list.length + ' done</div></div></div>';
+    if (allDone(k)) html += '<div class="alldone">🎉 Done for the day! 🎉</div>';
+    html += '<div class="list">';
+    if (!list.length) html += '<div class="empty">No chores today 😎</div>';
+    list.forEach(function (c, ri) {
+      var f = (focus.c === ci && focus.r === ri) ? ' focus' : '';
+      html += '<button class="chore' + (c.done ? ' done' : '') + f + '" data-c="' + ci + '" data-r="' + ri + '">' +
+        '<span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '</span>' +
+        '<span class="val money">' + money(c.value) + '</span><span class="ck">' + (c.done ? '✓' : '') + '</span></button>';
+    });
+    html += '</div><div class="bank">' +
+      '<div class="wk"><small>This week</small><b class="money">' + money(k.pending) + '</b></div>' +
+      '<div class="sv"><small>💰 Savings</small><b class="money">' + money(k.savings) + '</b></div>' +
+      '<div class="sp"><small>🛍️ Spending</small><b class="money">' + money(k.spending) + '</b></div></div></section>';
+  });
+  el.innerHTML = html + '</div>';
+  var f = el.querySelector('.chore.focus');
+  if (f && f.scrollIntoView) f.scrollIntoView({block: 'nearest'});
+}
+
+function clampFocus() {
+  if (!S.kids.length) return;
+  focus.c = Math.max(0, Math.min(focus.c, S.kids.length - 1));
+  var len = todayChores(S.kids[focus.c]).length;
+  focus.r = len ? Math.max(0, Math.min(focus.r, len - 1)) : 0;
+}
+
+function moveFocus(dc, dr) {
+  if (dc) {
+    var c = focus.c;
+    for (var i = 0; i < S.kids.length; i++) {          // skip kids with no chores today
+      c = (c + dc + S.kids.length) % S.kids.length;
+      if (todayChores(S.kids[c]).length) break;
+    }
+    focus.c = c;
+  }
+  if (dr) focus.r += dr;
+  clampFocus();
+  renderTV();
+}
+
+function tvToggle(ci, ri) {
+  var k = S.kids[ci]; if (!k) return;
+  var c = todayChores(k)[ri]; if (!c) return;
+  var wasAll = allDone(k);
+  c.done = !c.done;                                   // optimistic
+  k.pending = Math.round((k.pending + (c.done ? c.value : -c.value)) * 100) / 100;
+  renderTV();
+  if (!wasAll && allDone(k)) celebrate(k);
+  call('toggleChore', k.id, c.id).then(function (st) { S = st; clampFocus(); renderTV(); })
+    .catch(function (e) { toast(errMsg(e)); refresh(); });
+}
+
+function celebrate(k) {
+  var p = document.getElementById('party');
+  p.innerHTML = '<div class="big">🏆</div><h3>Way to go, ' + esc(k.name) + '!</h3>' +
+    '<p>All your chores are done for today ⭐ You earned ' + money(earnedToday(k)) + '</p>';
+  p.className = '';
+  var emojis = ['⭐', '🌟', '✨', '⭐', '💫'];
+  for (var i = 0; i < 45; i++) {
+    var s = document.createElement('div');
+    s.className = 'fall';
+    s.textContent = emojis[i % emojis.length];
+    s.style.left = (Math.random() * 100) + 'vw';
+    s.style.fontSize = (2 + Math.random() * 4) + 'vw';
+    s.style.animationDuration = (2.5 + Math.random() * 3) + 's';
+    s.style.animationDelay = (Math.random() * 2.5) + 's';
+    p.appendChild(s);
+  }
+  clearTimeout(celebrate._t);
+  celebrate._t = setTimeout(closeParty, 9000);
+}
+function closeParty() { document.getElementById('party').className = 'hidden'; }
+
+function tvKeys(e) {
+  var k = e.key, code = e.keyCode;
+  var partyOpen = document.getElementById('party').className !== 'hidden';
+  if (partyOpen) { closeParty(); e.preventDefault(); return; }
+  if (k === 'ArrowRight' || code === 39) { moveFocus(1, 0); }
+  else if (k === 'ArrowLeft' || code === 37) { moveFocus(-1, 0); }
+  else if (k === 'ArrowDown' || code === 40) { moveFocus(0, 1); }
+  else if (k === 'ArrowUp' || code === 38) { moveFocus(0, -1); }
+  else if (k === 'Enter' || k === ' ' || code === 13 || code === 23 || code === 32) { tvToggle(focus.c, focus.r); }
+  else return;
+  e.preventDefault();
+}
+
+function startTV() {
+  document.getElementById('tv').className = '';
+  document.body.style.overflow = 'hidden';
+  // start on the first kid that has chores
+  for (var i = 0; i < S.kids.length; i++) if (todayChores(S.kids[i]).length) { focus.c = i; break; }
+  renderTV();
+  document.addEventListener('keydown', tvKeys);
+  document.getElementById('tv').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.chore') : null;
+    if (!b) return;
+    focus.c = +b.dataset.c; focus.r = +b.dataset.r;
+    tvToggle(focus.c, focus.r);
+  });
+  document.getElementById('party').addEventListener('click', closeParty);
+  try { window.focus(); } catch (e) {}
+  // pick up changes made from phones, and roll over at midnight
+  setInterval(refresh, 30000);
+}
+
+function refresh() {
+  if (busy) return;
+  call('getState').then(function (st) {
+    S = st;
+    if (MODE === 'tv') { clampFocus(); renderTV(); } else renderParent();
+  }).catch(function () {});
+}
+
+// ======================================================
+// PARENT (phone)
+// ======================================================
+var PIN = null, tab = 'kids';
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function startParent() {
+  document.getElementById('parent').className = '';
+  var saved = lsGet('chorePin');
+  if (saved) {
+    call('parent', saved, 'check').then(function (st) { PIN = saved; S = st; renderParent(); })
+      .catch(function () { showPin(); });
+  } else showPin();
+  setInterval(function () { if (PIN && document.getElementById('modal').className === 'hidden') refresh(); }, 30000);
+}
+
+function showPin(msg) {
+  document.getElementById('parent').innerHTML = '<div class="pinbox"><h1>👨‍👩‍👧‍👦 Parent Mode</h1>' +
+    '<div class="sub">' + (msg || 'Enter your PIN') + '</div>' +
+    '<input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">' +
+    '<button class="btn pri full" id="pinGo">Unlock</button></div>';
+  var go = function () {
+    var v = document.getElementById('pin').value;
+    call('parent', v, 'check').then(function (st) { PIN = v; lsSet('chorePin', v); S = st; renderParent(); })
+      .catch(function (e) { showPin(errMsg(e)); });
+  };
+  document.getElementById('pinGo').onclick = go;
+  document.getElementById('pin').onkeydown = function (e) { if (e.key === 'Enter') go(); };
+}
+
+function act(action, args, okMsg) {
+  busy = true;
+  return call('parent', PIN, action, args || {}).then(function (st) {
+    S = st; busy = false; closeModal(); renderParent(); if (okMsg) toast(okMsg, true);
+  }).catch(function (e) { busy = false; toast(errMsg(e)); if (/PIN/.test(errMsg(e))) { lsSet('chorePin', ''); showPin(); } });
+}
+
+function kidById(id) { return S.kids.filter(function (k) { return k.id === id; })[0]; }
+
+function renderParent() {
+  var el = document.getElementById('parent');
+  var st = S.settings;
+  var h = '<h1>⭐ Chore Chart</h1><div class="sub">Pay day: ' + DAY_NAMES[st.paydayDay] + 's at ' + fmtHour(st.paydayHour) +
+    (st.lastPayday ? ' · last paid ' + st.lastPayday : '') + '</div>' +
+    '<div class="tabs">' + ['kids:Kids', 'chores:Chores', 'history:History', 'settings:Settings'].map(function (t) {
+      var p = t.split(':'); return '<button data-tab="' + p[0] + '" class="' + (tab === p[0] ? 'on' : '') + '">' + p[1] + '</button>';
+    }).join('') + '</div>';
+  if (tab === 'kids') h += viewKids();
+  if (tab === 'chores') h += viewChores();
+  if (tab === 'history') h += viewHistory();
+  if (tab === 'settings') h += viewSettings();
+  el.innerHTML = h;
+}
+
+function viewKids() {
+  var h = '';
+  S.kids.forEach(function (k) {
+    var t = todayChores(k), n = t.filter(function (c) { return c.done; }).length;
+    h += '<div class="card" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) + (allDone(k) ? ' <span>🎉 ⭐</span>' : '') +
+      '<span class="sub">' + n + '/' + t.length + ' today</span></h2>' +
+      '<div class="row3"><div><small>This week</small><b class="money" style="color:#fde68a">' + money(k.pending) + '</b></div>' +
+      '<div><small>💰 Savings</small><b class="money" style="color:#86efac">' + money(k.savings) + '</b></div>' +
+      '<div><small>🛍️ Spending</small><b class="money" style="color:#7dd3fc">' + money(k.spending) + '</b></div></div>' +
+      '<div class="btns"><button class="btn red" data-act="spend" data-kid="' + k.id + '">Spend</button>' +
+      '<button class="btn grn" data-act="add" data-kid="' + k.id + '">Add / bonus</button>' +
+      '<button class="btn" data-act="move" data-kid="' + k.id + '">Move</button>' +
+      '<button class="btn" data-act="today" data-kid="' + k.id + '">Today’s chores</button></div></div>';
+  });
+  var pend = S.kids.reduce(function (s, k) { return s + k.pending; }, 0);
+  h += '<button class="btn pri full" data-act="payday">Pay out this week now (' + money(pend) + ')</button>' +
+    '<div class="sub" style="margin-top:8px">“This week” is what they’ve earned since the last pay day. On pay day it splits into Savings and Spending by each kid’s savings %.</div>';
+  return h;
+}
+
+function viewChores() {
+  var h = '';
+  S.kids.forEach(function (k) {
+    h += '<div class="card" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) +
+      '<button class="btn pri" data-act="newChore" data-kid="' + k.id + '">+ Add</button></h2>';
+    if (!k.chores.length) h += '<div class="sub" style="padding:10px 0">No chores yet</div>';
+    k.chores.forEach(function (c) {
+      h += '<div class="li' + (c.active ? '' : ' off') + '"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) +
+        '<small>' + money(c.value) + ' · ' + daysLabel(c.days) + (c.active ? '' : ' · paused') + '</small></span>' +
+        '<button class="btn" data-act="editChore" data-kid="' + k.id + '" data-id="' + c.id + '">Edit</button></div>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+
+function viewHistory() {
+  if (!S.ledger.length) return '<div class="card"><div class="sub">No money activity yet. Pay days, spending, and bonuses show up here.</div></div>';
+  var h = '<div class="card hist">';
+  S.ledger.forEach(function (l) {
+    var k = kidById(l.kidId) || {name: l.kidId};
+    var d = new Date(l.ts);
+    var parts = [];
+    if (l.savings) parts.push('<span class="' + (l.savings < 0 ? 'neg' : 'pos') + '">💰 ' + money(l.savings) + '</span>');
+    if (l.spending) parts.push('<span class="' + (l.spending < 0 ? 'neg' : 'pos') + '">🛍️ ' + money(l.spending) + '</span>');
+    h += '<div class="li"><span class="nm"><b>' + esc(k.name) + '</b> — ' + esc(l.note || l.type) +
+      '<small>' + (isNaN(d) ? '' : d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})) + '</small></span>' +
+      '<span class="amt">' + parts.join('<br>') + '</span></div>';
+  });
+  return h + '</div>';
+}
+
+function viewSettings() {
+  var st = S.settings;
+  var h = '<div class="card"><h2>Savings split</h2><div class="sub">Share of each pay day that goes to Savings. The rest goes to Spending.</div>';
+  S.kids.forEach(function (k) {
+    h += '<label>' + esc(k.name) + ' — saves <b id="pv_' + k.id + '">' + k.savingsPct + '</b>%</label>' +
+      '<input type="range" min="0" max="100" step="5" value="' + k.savingsPct + '" data-pct="' + k.id + '">';
+  });
+  h += '<button class="btn pri full" style="margin-top:12px" data-act="savePct">Save split</button></div>';
+  h += '<div class="card"><h2>Pay day</h2><label>Day</label><select id="pdDay">' + DAY_NAMES.map(function (n, i) {
+      return '<option value="' + i + '"' + (i === st.paydayDay ? ' selected' : '') + '>' + n + '</option>';
+    }).join('') + '</select><label>Time</label><select id="pdHour">';
+  for (var hr = 6; hr <= 22; hr++) h += '<option value="' + hr + '"' + (hr === st.paydayHour ? ' selected' : '') + '>' + fmtHour(hr) + '</option>';
+  h += '</select><button class="btn pri full" style="margin-top:12px" data-act="savePayday">Save pay day</button></div>';
+  h += '<div class="card"><h2>Parent PIN</h2><label>New PIN (4–8 digits)</label><input id="newPin" type="password" inputmode="numeric" maxlength="8">' +
+    '<button class="btn pri full" style="margin-top:12px" data-act="savePin">Change PIN</button></div>' +
+    '<button class="btn full" data-act="lock">Lock parent mode on this phone</button>';
+  return h;
+}
+
+function fmtHour(h) { h = Number(h); return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM'); }
+function daysLabel(d) {
+  d = String(d || 'daily');
+  if (d.toLowerCase() === 'daily') return 'every day';
+  var a = d.split(/[\s,]+/).filter(Boolean);
+  if (a.length === 5 && ['Mo','Tu','We','Th','Fr'].every(function (x) { return a.indexOf(x) >= 0; })) return 'weekdays';
+  if (a.length === 2 && a.indexOf('Sa') >= 0 && a.indexOf('Su') >= 0) return 'weekends';
+  return a.join(', ');
+}
+
+// ---------- modals ----------
+function openModal(html) { var m = document.getElementById('modal'); m.innerHTML = '<div class="sheet">' + html + '</div>'; m.className = ''; }
+function closeModal() { document.getElementById('modal').className = 'hidden'; }
+
+function moneyModal(kind, kidId) {
+  var k = kidById(kidId);
+  var title = {spend: 'Spend money', add: 'Add money / bonus', move: 'Move money'}[kind];
+  var h = '<h3>' + title + ' — ' + esc(k.name) + '</h3><div class="sub">Savings ' + money(k.savings) + ' · Spending ' + money(k.spending) + '</div>';
+  if (kind === 'move') {
+    h += '<label>Direction</label><div class="seg" id="seg"><button class="on" data-v="spending">Savings → Spending</button><button data-v="savings">Spending → Savings</button></div>';
+  } else {
+    h += '<label>' + (kind === 'spend' ? 'Take it from' : 'Put it in') + '</label><div class="seg" id="seg">' +
+      '<button class="' + (kind === 'spend' ? 'on' : '') + '" data-v="spending">🛍️ Spending</button><button class="' + (kind === 'add' ? 'on' : '') + '" data-v="savings">💰 Savings</button></div>';
+  }
+  h += '<label>Amount</label><input id="mAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00">' +
+    '<label>Note (optional)</label><input id="mNote" placeholder="' + (kind === 'spend' ? 'e.g. Toy at Walmart' : kind === 'add' ? 'e.g. Helped stack wood' : '') + '">' +
+    '<div class="btns" style="margin-top:16px"><button class="btn" data-act="close" style="flex:1">Cancel</button>' +
+    '<button class="btn pri" style="flex:2" data-act="doMoney" data-kind="' + kind + '" data-kid="' + kidId + '">Save</button></div>';
+  openModal(h);
+}
+
+function doMoney(kind, kidId) {
+  var amt = Math.abs(parseFloat(document.getElementById('mAmt').value) || 0);
+  var note = document.getElementById('mNote').value;
+  var bucket = document.querySelector('#seg button.on').dataset.v;
+  if (!amt) { toast('Enter an amount'); return; }
+  var k = kidById(kidId);
+  if (kind === 'move') return act('move', {kidId: kidId, to: bucket, amount: amt, note: note}, 'Moved ' + money(amt));
+  if (kind === 'spend' && amt > k[bucket] + 0.001 && !confirm(k.name + ' only has ' + money(k[bucket]) + ' in ' + bucket + '. Go negative anyway?')) return;
+  act('txn', {kidId: kidId, bucket: bucket, amount: kind === 'spend' ? -amt : amt, note: note || (kind === 'spend' ? 'Spent' : 'Bonus'), type: kind}, 'Saved');
+}
+
+function todayModal(kidId) {
+  var k = kidById(kidId);
+  var t = todayChores(k);
+  var h = '<h3>' + esc(k.name) + ' — today</h3><div class="sub">Tap to check or uncheck</div>';
+  if (!t.length) h += '<div class="sub" style="padding:12px 0">No chores today</div>';
+  t.forEach(function (c) {
+    h += '<div class="li"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '<small>' + money(c.value) + '</small></span>' +
+      '<button class="tog' + (c.done ? ' on' : '') + '" data-act="ptoggle" data-kid="' + kidId + '" data-id="' + c.id + '">' + (c.done ? '✓' : '') + '</button></div>';
+  });
+  h += '<button class="btn full" style="margin-top:14px" data-act="close">Close</button>';
+  openModal(h);
+}
+
+var editDays = [];
+function choreModal(kidId, choreId) {
+  var k = kidById(kidId);
+  var c = choreId ? k.chores.filter(function (x) { return x.id === choreId; })[0] : {name: '', icon: '⭐', value: 0.25, days: 'daily', active: true};
+  var d = String(c.days || 'daily');
+  editDays = d.toLowerCase() === 'daily' ? DAYS.slice() : d.split(/[\s,]+/).filter(Boolean);
+  var h = '<h3>' + (choreId ? 'Edit chore' : 'New chore') + ' — ' + esc(k.name) + '</h3>' +
+    '<label>Chore</label><input id="cName" value="' + esc(c.name) + '" placeholder="e.g. Feed the dog">' +
+    '<label>Emoji</label><input id="cIcon" value="' + esc(c.icon) + '" maxlength="4">' +
+    '<div class="chips" style="margin-top:6px">' + ['🛏️','🪥','🧺','🧦','🧸','🍽️','🍴','🗑️','📚','🧹','🐶','🐱','🐔','🌱','🚗','🪵','🧼','👕','🎒','✏️'].map(function (e) {
+      return '<button data-act="pickIcon" data-v="' + e + '">' + e + '</button>'; }).join('') + '</div>' +
+    '<label>Pays ($)</label><input id="cVal" type="number" inputmode="decimal" step="0.05" min="0" value="' + Number(c.value).toFixed(2) + '">' +
+    '<label>Which days</label><div class="chips" id="dayChips">' + DAYS.map(function (x) {
+      return '<button data-act="day" data-v="' + x + '" class="' + (editDays.indexOf(x) >= 0 ? 'on' : '') + '">' + x + '</button>'; }).join('') + '</div>' +
+    '<label><input type="checkbox" id="cAct" style="width:auto"' + (c.active ? ' checked' : '') + '> Active (uncheck to pause)</label>' +
+    '<div class="btns" style="margin-top:16px">' + (choreId ? '<button class="btn red" data-act="delChore" data-id="' + choreId + '">Delete</button>' : '') +
+    '<button class="btn" data-act="close" style="flex:1">Cancel</button>' +
+    '<button class="btn pri" style="flex:2" data-act="saveChore" data-kid="' + kidId + '" data-id="' + (choreId || '') + '">Save</button></div>';
+  openModal(h);
+}
+
+// ---------- parent click router ----------
+document.addEventListener('click', function (e) {
+  if (MODE !== 'parent') return;
+  var t = e.target.closest ? e.target.closest('[data-act],[data-tab],#seg button') : null;
+  if (!t) { if (e.target.id === 'modal') closeModal(); return; }
+  if (t.dataset.tab) { tab = t.dataset.tab; renderParent(); return; }
+  if (t.parentNode && t.parentNode.id === 'seg') {
+    Array.prototype.forEach.call(t.parentNode.children, function (b) { b.className = ''; });
+    t.className = 'on'; return;
+  }
+  var a = t.dataset.act, kid = t.dataset.kid, id = t.dataset.id;
+  switch (a) {
+    case 'spend': case 'add': case 'move': moneyModal(a, kid); break;
+    case 'doMoney': doMoney(t.dataset.kind, kid); break;
+    case 'today': todayModal(kid); break;
+    case 'ptoggle':
+      busy = true;
+      call('parent', PIN, 'toggle', {kidId: kid, choreId: id}).then(function (st) { S = st; busy = false; renderParent(); todayModal(kid); })
+        .catch(function (err) { busy = false; toast(errMsg(err)); });
+      break;
+    case 'payday':
+      if (confirm('Pay out everything earned this week now? It will split into Savings and Spending.')) act('payday', {}, 'Paid out!');
+      break;
+    case 'newChore': choreModal(kid); break;
+    case 'editChore': choreModal(kid, id); break;
+    case 'pickIcon': document.getElementById('cIcon').value = t.dataset.v; break;
+    case 'day':
+      var i = editDays.indexOf(t.dataset.v);
+      if (i >= 0) editDays.splice(i, 1); else editDays.push(t.dataset.v);
+      t.className = i >= 0 ? '' : 'on'; break;
+    case 'saveChore':
+      var name = document.getElementById('cName').value.trim();
+      if (!name) { toast('Give the chore a name'); return; }
+      if (!editDays.length) { toast('Pick at least one day'); return; }
+      var days = editDays.length === 7 ? 'daily' : DAYS.filter(function (x) { return editDays.indexOf(x) >= 0; }).join(',');
+      act('saveChore', {id: id || '', kidId: kid, name: name, icon: document.getElementById('cIcon').value.trim() || '⭐',
+        value: parseFloat(document.getElementById('cVal').value) || 0, days: days, active: document.getElementById('cAct').checked}, 'Chore saved');
+      break;
+    case 'delChore':
+      if (confirm('Delete this chore? (Money already earned stays.)')) act('deleteChore', {id: id}, 'Deleted');
+      break;
+    case 'savePct':
+      var inputs = document.querySelectorAll('[data-pct]');
+      var chain = Promise.resolve();
+      busy = true;
+      Array.prototype.forEach.call(inputs, function (inp) {
+        chain = chain.then(function () { return call('parent', PIN, 'saveKid', {id: inp.dataset.pct, savingsPct: inp.value}); })
+          .then(function (st) { S = st; });
+      });
+      chain.then(function () { busy = false; renderParent(); toast('Savings split saved', true); })
+        .catch(function (err) { busy = false; toast(errMsg(err)); });
+      break;
+    case 'savePayday':
+      act('setPayday', {day: +document.getElementById('pdDay').value, hour: +document.getElementById('pdHour').value}, 'Pay day saved');
+      break;
+    case 'savePin':
+      var np = document.getElementById('newPin').value;
+      call('parent', PIN, 'setPin', {newPin: np}).then(function (st) { PIN = np; lsSet('chorePin', np); S = st; renderParent(); toast('PIN changed', true); })
+        .catch(function (err) { toast(errMsg(err)); });
+      break;
+    case 'lock': PIN = null; lsSet('chorePin', ''); showPin(); break;
+    case 'close': closeModal(); break;
+  }
+});
+document.addEventListener('input', function (e) {
+  if (e.target.dataset && e.target.dataset.pct) document.getElementById('pv_' + e.target.dataset.pct).textContent = e.target.value;
+});
+
+// ---------- boot ----------
+if (MODE === 'parent') {
+  document.getElementById('loading').className = 'hidden';
+  startParent();
+} else {
+  call('getState').then(function (st) {
+    S = st;
+    document.getElementById('loading').className = 'hidden';
+    startTV();
+  }).catch(function (e) {
+    document.getElementById('loading').textContent = 'Could not load chores: ' + errMsg(e);
+    setTimeout(function () { location.reload(); }, 15000);
+  });
+}
+</script>
+</body>
+</html>

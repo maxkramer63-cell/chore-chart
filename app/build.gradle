@@ -1,0 +1,37 @@
+plugins { id 'com.android.application' }
+
+// The Google Apps Script web app URL comes from the WEB_APP_URL repo secret (see README)
+def webUrl = (System.getenv('WEB_APP_URL') ?: '').trim()
+def runNum = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as Integer
+
+android {
+    namespace 'com.family.chorechart'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.family.chorechart'
+        minSdk 22
+        targetSdk 34
+        versionCode runNum
+        versionName "1.0.${runNum}"
+        buildConfigField 'String', 'WEB_APP_URL', "\"${webUrl}\""
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        release {
+            storeFile file('chorechart.jks')
+            storePassword 'chorechart'
+            keyAlias 'chorechart'
+            keyPassword 'chorechart'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
