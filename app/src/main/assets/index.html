@@ -27,7 +27,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .progress{font-size:calc(1.1*var(--u));color:#94a3b8;text-align:right}
 .list{flex:1;overflow:hidden;padding:calc(.4*var(--u)) calc(1*var(--u));display:flex;flex-direction:column;gap:calc(.7*var(--u))}
 .chore{display:flex;align-items:center;gap:calc(1*var(--u));padding:calc(.8*var(--u)) calc(1*var(--u));border-radius:calc(1*var(--u));background:#334155;
-  border:calc(.25*var(--u)) solid transparent;transition:transform .12s,background .2s,border-color .12s;text-align:left;width:100%}
+  border:calc(.3*var(--u)) solid transparent;text-align:left;width:100%}
 .chore .ic{font-size:calc(2.4*var(--u));width:calc(3*var(--u));text-align:center}
 .chore .nm{flex:1;font-size:calc(1.55*var(--u));font-weight:bold;line-height:1.15}
 .chore .val{font-size:calc(1.3*var(--u));background:#0f172a;border-radius:calc(2*var(--u));padding:calc(.25*var(--u)) calc(.8*var(--u));color:#fde68a}
@@ -36,7 +36,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .chore.done{background:#14532d}
 .chore.done .nm{color:#bbf7d0}
 .chore.done .ck{background:#22c55e;border-color:#22c55e;color:#fff}
-.chore.focus{border-color:#fff;transform:scale(1.04);box-shadow:0 0 0 calc(.3*var(--u)) var(--c),0 calc(.6*var(--u)) calc(1.6*var(--u)) rgba(0,0,0,.5);background:#475569}
+.chore.focus{border-color:#fde047;background:#475569;outline:calc(.25*var(--u)) solid var(--c)}
 .chore.done.focus{background:#166534}
 .alldone{margin:0 calc(1*var(--u));padding:calc(.7*var(--u));border-radius:calc(1*var(--u));text-align:center;font-size:calc(1.5*var(--u));font-weight:bold;
   background:linear-gradient(90deg,#f59e0b,#fde047,#f59e0b);color:#422006}
@@ -54,7 +54,8 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #party p{font-size:calc(2.2*var(--u));margin-top:calc(1*var(--u));text-align:center}
 #party .big{font-size:calc(9*var(--u));animation:spin 2.4s ease-in-out infinite}
 .fall{position:absolute;top:-10vh;animation:fall linear forwards;pointer-events:none}
-@keyframes fall{to{transform:translateY(120vh) rotate(540deg)}}
+@keyframes fall{to{transform:translateY(120vh)}}
+.fall{will-change:transform}
 @keyframes pop{0%{transform:scale(.3)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
 @keyframes spin{0%,100%{transform:rotate(-12deg) scale(1)}50%{transform:rotate(12deg) scale(1.15)}}
 
@@ -147,6 +148,8 @@ if (typeof google === 'undefined' && window.Native) {
 var S = null;                 // state from server
 var focus = {c: 0, r: 0};     // TV focus
 var busy = false;
+var pending = 0;              // chore taps still waiting on the server
+var lastJson = '';
 var tvView = false;            // parent looking at the TV board on a phone
 var tvClicksBound = false;
 var DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -255,7 +258,15 @@ function moveFocus(dc, dr) {
   }
   if (dr) focus.r += dr;
   clampFocus();
-  renderTV();
+  paintFocus();
+}
+
+function paintFocus() {
+  var old = document.querySelector('#tv .chore.focus');
+  if (old) old.classList.remove('focus');
+  if (tvView) return;
+  var el = document.querySelector('#tv .chore[data-c="' + focus.c + '"][data-r="' + focus.r + '"]');
+  if (el) { el.classList.add('focus'); if (el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }
 }
 
 function tvToggle(ci, ri) {
@@ -266,8 +277,11 @@ function tvToggle(ci, ri) {
   k.pending = Math.round((k.pending + (c.done ? c.value : -c.value)) * 100) / 100;
   renderTV();
   if (!wasAll && allDone(k)) celebrate(k);
-  call('toggleChore', k.id, c.id).then(function (st) { S = st; clampFocus(); renderTV(); })
-    .catch(function (e) { toast(errMsg(e)); refresh(); });
+  pending++;
+  call('toggleChore', k.id, c.id).then(function (st) {
+    pending--;
+    if (pending === 0) applyState(st);      // newer taps win; only take the server copy once all are saved
+  }).catch(function (e) { pending--; toast(errMsg(e)); refresh(true); });
 }
 
 function celebrate(k) {
@@ -276,7 +290,7 @@ function celebrate(k) {
     '<p>All your chores are done for today ⭐ You earned ' + money(earnedToday(k)) + '</p>';
   p.className = tvView ? 'phonetv' : '';
   var emojis = ['⭐', '🌟', '✨', '⭐', '💫'];
-  for (var i = 0; i < 45; i++) {
+  for (var i = 0; i < (MODE === 'tv' ? 22 : 40); i++) {
     var s = document.createElement('div');
     s.className = 'fall';
     s.textContent = emojis[i % emojis.length];
@@ -317,12 +331,16 @@ function startTV() {
   setInterval(refresh, 30000);
 }
 
-function refresh() {
-  if (busy) return;
-  call('getState').then(function (st) {
-    S = st;
-    if (MODE === 'tv' || tvView) { clampFocus(); renderTV(); } else renderParent();
-  }).catch(function () {});
+function applyState(st) {
+  var j = JSON.stringify(st);
+  if (j === lastJson && S) return;          // nothing changed: leave the screen alone
+  lastJson = j; S = st;
+  if (MODE === 'tv' || tvView) { clampFocus(); renderTV(); } else renderParent();
+}
+function refresh(force) {
+  if (busy || pending) return;
+  if (force) lastJson = '';
+  call('getState').then(function (st) { if (!pending) applyState(st); }).catch(function () {});
 }
 
 // ======================================================
@@ -608,7 +626,7 @@ if (MODE === 'parent') {
   startParent();
 } else {
   call('getState').then(function (st) {
-    S = st;
+    S = st; lastJson = JSON.stringify(st);
     document.getElementById('loading').className = 'hidden';
     startTV();
   }).catch(function (e) {
