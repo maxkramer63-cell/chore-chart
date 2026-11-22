@@ -89,6 +89,19 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
 .whead .wd.now{color:#fde047;box-shadow:none}
 .tag{font-size:calc(.95*var(--u));font-weight:bold;padding:calc(.1*var(--u)) calc(.6*var(--u));border-radius:calc(1*var(--u));margin-left:calc(.5*var(--u));background:#f59e0b;color:#422006;white-space:nowrap}
 .tag.early{background:#86efac;color:#14532d}
+/* bonus chore pop-up */
+#bonus{position:fixed;inset:0;background:rgba(15,23,42,.9);display:flex;align-items:center;justify-content:center;z-index:45;--u:1vw}
+#bonus.phonetv{--u:2.6vw}
+#bonus .bsheet{background:#1e293b;border-radius:calc(1.4*var(--u));padding:calc(1.6*var(--u)) calc(2*var(--u));width:calc(46*var(--u));max-width:94vw;border-top:calc(.5*var(--u)) solid #f59e0b}
+#bonus h3{font-size:calc(2.2*var(--u));margin-bottom:calc(.6*var(--u))}
+#bonus label{display:block;font-size:calc(1.1*var(--u));color:#94a3b8;margin:calc(.9*var(--u)) 0 calc(.3*var(--u))}
+#bonus input{width:100%;padding:calc(.6*var(--u)) calc(.9*var(--u));font-size:calc(1.5*var(--u));border-radius:calc(.7*var(--u));border:calc(.2*var(--u)) solid #475569;background:#0f172a;color:#f1f5f9}
+#bonus .bkids,#bonus .bbtns{display:flex;gap:calc(.6*var(--u))}
+#bonus .bbtns{margin-top:calc(1.4*var(--u))}
+#bonus button{flex:1;padding:calc(.6*var(--u));font-size:calc(1.4*var(--u));font-weight:bold;border-radius:calc(.7*var(--u));background:#334155;border:calc(.25*var(--u)) solid transparent}
+#bonus button.on{background:#f1f5f9;color:#0f172a}
+#bonus button.pri{background:#f59e0b;color:#422006}
+#bonus .kf{border-color:#fde047!important;outline:calc(.2*var(--u)) solid #fde047}
 /* TV board shown on a phone */
 #tv.phonetv{height:auto;min-height:100vh;overflow:visible;--u:2.4vw;padding:12px 10px 30px}
 #tv.phonetv .cols{flex-direction:column}
@@ -162,6 +175,7 @@ input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #475569
 <div id="tv" class="hidden"></div>
 <div id="parent" class="hidden"></div>
 <div id="party" class="hidden"></div>
+<div id="bonus" class="hidden"></div>
 <div id="modal" class="hidden"></div>
 <div id="toast" class="hidden"></div>
 
@@ -213,8 +227,10 @@ function errMsg(e) { return (e && e.message ? e.message : String(e)).replace(/^E
 // ---- weekly rules (same as the server): a chore done early counts for its next day, a missed one can be caught up until Saturday
 var DAY_LETTERS = ['S','M','T','W','T','F','S'];
 var tvMode = 'today';
+function isBonus(c) { return String(c.days || '').indexOf('bonus:') === 0; }
 function schedDays(days) {
   days = String(days || 'daily').trim();
+  if (days.indexOf('bonus:') === 0) return S && days.slice(6) === S.weekStart ? [6] : [];
   if (!days || days.toLowerCase() === 'daily') return [0,1,2,3,4,5,6];
   return days.split(/[\s,]+/).map(function (x) { return DAYS.indexOf(x); }).filter(function (i) { return i >= 0; }).sort(function (a, b) { return a - b; });
 }
@@ -239,12 +255,16 @@ function wk(c) {
   var missed = occ.filter(function (o) { return o < S.dow && cov[o] === undefined; });
   return {occ: occ, cov: cov, legacy: false, doneToday: doneToday, count: c.weekDone.length, catchable: missed};
 }
-function activeChores(k) { return k.chores.filter(function (c) { return c.active; }); }
+function activeChores(k) {
+  var list = k.chores.filter(function (c) { return c.active && (!isBonus(c) || schedDays(c.days).length); });
+  return list.filter(function (c) { return !isBonus(c); }).concat(list.filter(isBonus));   // bonus chores at the bottom
+}
 // Today's list: chores due today, plus missed ones that can still be caught up, plus anything done today
 function todayChores(k) {
   return activeChores(k).filter(function (c) {
     var w = wk(c);
     c.tag = ''; c.locked = false; c.day = S.dow;
+    if (isBonus(c)) { c.day = 6; c.done = w.cov[6] !== undefined; c.tag = '⭐ bonus'; return !w.legacy; }
     if (c.today) {
       c.done = w.cov[S.dow] !== undefined;
       if (c.done && !w.doneToday) c.tag = 'done early';
@@ -341,7 +361,7 @@ function renderTV() {
   var el = document.getElementById('tv');
   var d = new Date();
   var week = tvMode === 'week';
-  var tabs = '<div class="tvtabs">' + ['today:Today', 'week:This week'].map(function (t, i) {
+  var tabs = '<div class="tvtabs">' + ['today:Today', 'week:This week', 'bonus:+ Bonus'].map(function (t, i) {
     var p = t.split(':');
     return '<button class="tab fx' + (tvMode === p[0] ? ' on' : '') + (!tvView && focus.bar && focus.b === i ? ' focus' : '') + '" data-tab="' + p[0] + '" data-i="' + i + '">' + p[1] + '</button>';
   }).join('') + '</div>';
@@ -405,6 +425,7 @@ function bindTvClicks() {
     if (e.target.closest && e.target.closest('[data-back]')) { closeTvView(); return; }
     var b = e.target.closest ? e.target.closest('.fx') : null;
     if (!b) return;
+    if (b.dataset.tab === 'bonus') { openBonus(); return; }
     if (b.dataset.tab) { setTvMode(b.dataset.tab); return; }
     focus.bar = false; focus.c = +b.dataset.c; focus.r = +b.dataset.r;
     if (b.dataset.d !== undefined) { focus.d = +b.dataset.d; tvToggle(focus.c, focus.r, focus.d); }
@@ -450,7 +471,7 @@ function setTvMode(m) {
 }
 function moveFocus(dc, dr) {
   if (focus.bar) {                                     // on the Today / This week buttons
-    if (dc) { focus.b = dc > 0 ? 1 : 0; setTvMode(focus.b ? 'week' : 'today'); paintFocus(); return; }
+    if (dc) { focus.b = Math.max(0, Math.min(2, focus.b + dc)); if (focus.b < 2) setTvMode(focus.b ? 'week' : 'today'); paintFocus(); return; }
     if (dr > 0) { focus.bar = false; focus.r = 0; clampFocus(); }
     paintFocus(); return;
   }
@@ -501,6 +522,80 @@ function tvToggle(ci, ri, day) {
   }).catch(function (e) { pending--; toast(errMsg(e)); refresh(true); });
 }
 
+// ---------- bonus chore pop-up (needs the parent PIN) ----------
+var bf = {g: 0, i: 0}, bonusKid = null;
+function openBonus() {
+  var el = document.getElementById('bonus');
+  bonusKid = (S.kids[focus.c] || S.kids[0] || {}).id;
+  el.innerHTML = '<div class="bsheet"><h3>⭐ Add a bonus chore</h3>' +
+    '<label>Parent PIN</label><input id="bPin" type="password" inputmode="numeric" maxlength="8" data-bf="0" autocomplete="off">' +
+    '<label>For</label><div class="bkids">' + S.kids.map(function (k) {
+      return '<button class="bk' + (k.id === bonusKid ? ' on' : '') + '" data-bf="1" data-kid="' + k.id + '">' + esc(k.name) + '</button>'; }).join('') + '</div>' +
+    '<label>Bonus chore</label><input id="bName" data-bf="2" maxlength="60" placeholder="Rake the leaves">' +
+    '<label>Pays ($)</label><input id="bAmt" type="number" inputmode="decimal" step="0.25" min="0" data-bf="3" placeholder="1.00">' +
+    '<div class="bbtns"><button data-bf="4" data-bact="cancel">Cancel</button><button class="pri" data-bf="4" data-bact="save">Add bonus</button></div></div>';
+  el.className = tvView ? 'phonetv' : '';
+  bonusFocus(0, 0);
+}
+function closeBonus() { document.getElementById('bonus').className = 'hidden'; paintFocus(); }
+function bonusEls(g) { return document.querySelectorAll('#bonus [data-bf="' + g + '"]'); }
+function bonusFocus(g, i) {
+  var all = document.querySelectorAll('#bonus .kf');
+  for (var x = 0; x < all.length; x++) all[x].classList.remove('kf');
+  bf.g = Math.max(0, Math.min(4, g));
+  var els = bonusEls(bf.g); bf.i = Math.max(0, Math.min(els.length - 1, i));
+  var el = els[bf.i]; if (!el) return;
+  bf.opened = false;
+  el.classList.add('kf');
+  if (!tvView) { try { el.focus(); } catch (x) {} }
+}
+function bonusPress(el) {
+  if (el.dataset.kid) {
+    bonusKid = el.dataset.kid;
+    var ks = bonusEls(1); for (var x = 0; x < ks.length; x++) ks[x].classList.toggle('on', ks[x].dataset.kid === bonusKid);
+  } else if (el.dataset.bact === 'cancel') closeBonus();
+  else if (el.dataset.bact === 'save') saveBonus();
+}
+function bonusKeys(e) {
+  var k = e.key, code = e.keyCode, el = bonusEls(bf.g)[bf.i], typing = el && el.tagName === 'INPUT';
+  if (k === 'Escape' || code === 27) { closeBonus(); }
+  else if (k === 'ArrowDown' || code === 40) { bonusFocus(bf.g + 1, bf.g + 1 === 4 ? 1 : 0); }
+  else if (k === 'ArrowUp' || code === 38) { bonusFocus(bf.g - 1, 0); }
+  else if (!typing && (k === 'ArrowRight' || code === 39)) { bonusFocus(bf.g, bf.i + 1); }
+  else if (!typing && (k === 'ArrowLeft' || code === 37)) { bonusFocus(bf.g, bf.i - 1); }
+  else if (k === 'Enter' || code === 13 || code === 23) {
+    // first OK on a box opens the TV keyboard; OK again (or the keyboard's Next) moves on
+    if (typing && !bf.opened) { bf.opened = true; return; }
+    if (typing) { bonusFocus(bf.g + 1, bf.g + 1 === 4 ? 1 : 0); }
+    else bonusPress(el);
+  } else return;
+  e.preventDefault();
+}
+function saveBonus() {
+  var pin = document.getElementById('bPin').value, name = document.getElementById('bName').value.trim();
+  var amt = round2(parseFloat(document.getElementById('bAmt').value) || 0);
+  if (!pin) { toast('Enter the parent PIN'); bonusFocus(0, 0); return; }
+  if (!name) { toast('Type the bonus chore'); bonusFocus(2, 0); return; }
+  if (!(amt > 0)) { toast('Enter what it pays'); bonusFocus(3, 0); return; }
+  busy = true; toast('Adding bonus…', true);
+  call('parent', pin, 'addBonus', {kidId: bonusKid, name: name, value: amt}).then(function (st) {
+    busy = false; closeBonus(); lastJson = ''; applyState(st); toast('Bonus added ⭐ ' + money(amt), true);
+  }).catch(function (err) { busy = false; toast(errMsg(err)); if (/PIN/.test(errMsg(err))) { document.getElementById('bPin').value = ''; bonusFocus(0, 0); } });
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('#bonus button') : null;
+  if (b) { bonusPress(b); return; }
+  if (e.target.id === 'bonus') closeBonus();
+});
+// Back button (Android): close whatever is open first
+window.handleBack = function () {
+  if (!document.getElementById('bonus').classList.contains('hidden')) { closeBonus(); return 1; }
+  if (!document.getElementById('party').classList.contains('hidden')) { closeParty(); return 1; }
+  var m = document.getElementById('modal'); if (m && m.className !== 'hidden') { m.className = 'hidden'; return 1; }
+  if (tvView) { closeTvView(); return 1; }
+  return 0;
+};
+
 // Save a day's check-off; falls back to today-only if the Google script hasn't been updated yet
 function saveDay(k, c, day, viaParent) {
   var p = viaParent ? call('parent', PIN, 'toggleDay', {kidId: k.id, choreId: c.id, day: day}) : call('toggleDay', k.id, c.id, day);
@@ -533,6 +628,7 @@ function closeParty() { document.getElementById('party').className = 'hidden' + 
 
 function tvKeys(e) {
   var k = e.key, code = e.keyCode;
+  if (!document.getElementById('bonus').classList.contains('hidden')) { bonusKeys(e); return; }
   var partyOpen = !document.getElementById('party').classList.contains('hidden');
   if (partyOpen) { closeParty(); e.preventDefault(); return; }
   if (k === 'ArrowRight' || code === 39) { moveFocus(1, 0); }
@@ -540,7 +636,8 @@ function tvKeys(e) {
   else if (k === 'ArrowDown' || code === 40) { moveFocus(0, 1); }
   else if (k === 'ArrowUp' || code === 38) { moveFocus(0, -1); }
   else if (k === 'Enter' || k === ' ' || code === 13 || code === 23 || code === 32) {
-    if (focus.bar) { focus.bar = false; focus.r = 0; clampFocus(); paintFocus(); }
+    if (focus.bar && focus.b === 2) openBonus();
+    else if (focus.bar) { focus.bar = false; focus.r = 0; clampFocus(); paintFocus(); }
     else tvToggle(focus.c, focus.r, tvMode === 'week' ? focus.d : undefined);
   }
   else return;
@@ -664,7 +761,8 @@ function viewKids() {
       '<div class="btns"><button class="btn red" data-act="spend" data-kid="' + k.id + '">Spend</button>' +
       '<button class="btn grn" data-act="add" data-kid="' + k.id + '">Add / bonus</button>' +
       '<button class="btn" data-act="move" data-kid="' + k.id + '">Move</button>' +
-      '<button class="btn" data-act="today" data-kid="' + k.id + '">Today’s chores</button></div></div>';
+      '<button class="btn" data-act="today" data-kid="' + k.id + '">Today’s chores</button>' +
+      '<button class="btn" data-act="bonus" data-kid="' + k.id + '" style="background:#f59e0b;color:#422006">⭐ Bonus chore</button></div></div>';
   });
   var pend = S.kids.reduce(function (s, k) { return s + k.pending; }, 0);
   h += '<button class="btn pri full" data-act="payday">Pay out this week now (' + money(pend) + ')</button>' +
@@ -957,6 +1055,13 @@ function viewChores() {
       '<button class="btn pri" data-act="newChore" data-kid="' + k.id + '">+ Add</button></h2>';
     if (!k.chores.length) h += '<div class="sub" style="padding:10px 0">No chores yet</div>';
     k.chores.forEach(function (c) {
+      if (isBonus(c) && !schedDays(c.days).length) return;               // last week's bonus: hidden
+      if (isBonus(c)) {
+        h += '<div class="li"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) +
+          '<small>' + money(c.value) + ' · bonus this week</small></span>' +
+          (String(c.id).indexOf('tmp') === 0 ? '<span class="saving">Saving…</span>' : '<button class="btn" data-act="delChore" data-id="' + c.id + '">Remove</button>') + '</div>';
+        return;
+      }
       h += '<div class="li' + (c.active ? '' : ' off') + '"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) +
         '<small>' + money(c.value) + ' · ' + daysLabel(c.days) + (c.active ? '' : ' · paused') + '</small></span>' +
         (String(c.id).indexOf('tmp') === 0 ? '<span class="saving">Saving…</span>' :
@@ -1101,6 +1206,21 @@ document.addEventListener('click', function (e) {
     case 'spend': case 'add': case 'move': moneyModal(a, kid); break;
     case 'doMoney': doMoney(t.dataset.kind, kid); break;
     case 'today': todayModal(kid); break;
+    case 'bonus':
+      openModal('<h3>⭐ Bonus chore — ' + esc(kidById(kid).name) + '</h3><div class="sub">One time, any day this week (through Saturday). Shows at the bottom of their list.</div>' +
+        '<label>Bonus chore</label><input id="bxName" maxlength="60" placeholder="Rake the leaves">' +
+        '<label>Pays ($)</label><input id="bxAmt" type="number" inputmode="decimal" step="0.25" min="0" placeholder="1.00">' +
+        '<div class="btns" style="margin-top:16px"><button class="btn" data-act="close" style="flex:1">Cancel</button>' +
+        '<button class="btn pri" style="flex:2" data-act="saveBonus" data-kid="' + kid + '">Add bonus</button></div>');
+      break;
+    case 'saveBonus':
+      var bxn = document.getElementById('bxName').value.trim(), bxa = round2(parseFloat(document.getElementById('bxAmt').value) || 0);
+      if (!bxn) { toast('Type the bonus chore'); break; }
+      if (!(bxa > 0)) { toast('Enter what it pays'); break; }
+      act('addBonus', {kidId: kid, name: bxn, value: bxa}, 'Bonus added ⭐', function () {
+        kidById(kid).chores.push({id: 'tmp' + Date.now(), name: bxn, icon: '🌟', value: bxa, days: 'bonus:' + S.weekStart, active: true, today: false, done: false, weekDone: []});
+      });
+      break;
     case 'pday':
     case 'ptoggle':
       var pk = kidById(kid), pc = pk.chores.filter(function (x) { return x.id === id; })[0];
