@@ -445,16 +445,222 @@ function viewKids() {
 }
 
 var PRESET = {
-  addison: [['Make bed','🛏️',0.10,'daily'],['Unload dishwasher','🍽️',0.25,'daily'],['Clear & wipe table after supper','🧽',0.25,'daily'],
-    ['Feed & water the pets','🐶',0.15,'daily'],['Read 20 minutes','📚',0.15,'daily'],['Clean room','🧹',1.00,'Sa'],
-    ['Trash & recycling to the curb','🗑️',0.50,'Mo'],['Fold & put away laundry','👕',0.50,'We,Sa'],['Wipe bathroom sink & mirror','🚽',0.75,'Sa'],
-    ['Help make supper','🍳',0.75,'Su']],
-  maximus: [['Make bed','🛏️',0.10,'daily'],['Dirty clothes in hamper','🧺',0.10,'daily'],['Set the table','🍴',0.20,'daily'],
-    ['Pick up room','🧸',0.15,'daily'],['Read 15 minutes','📚',0.15,'daily'],['Empty small trash cans','🗑️',0.50,'Tu'],
-    ['Put away laundry','🧦',0.50,'Sa'],['Vacuum room','🧹',0.75,'Sa'],['Help outside or in the garage','🚗',0.75,'Sa']],
-  emery: [['Put toys away','🧸',0.10,'daily'],['Help make bed','🛏️',0.10,'daily'],['Clothes in hamper','🧦',0.05,'daily'],
-    ['Plate to the sink','🍽️',0.05,'daily'],['Brush teeth','🪥',0.05,'daily'],['Match socks','🧦',0.25,'Sa'],
-    ['Dust with a sock on your hand','🧹',0.25,'Sa'],['Water the plants','🌱',0.25,'We']]
+  "addison": [
+    [
+      "Make bed",
+      "🛏️",
+      0.1,
+      "daily"
+    ],
+    [
+      "Unload and load dishwasher",
+      "🍽️",
+      0.25,
+      "Mo,We,Fr"
+    ],
+    [
+      "Feed and water the pets",
+      "🐶",
+      0.15,
+      "daily"
+    ],
+    [
+      "Do homework",
+      "✏️",
+      0,
+      "Mo,Tu,We,Th,Fr"
+    ],
+    [
+      "Clean room",
+      "🧹",
+      1,
+      "Sa"
+    ],
+    [
+      "Trash and recycling to the curb",
+      "🗑️",
+      0.5,
+      "Mo"
+    ],
+    [
+      "Wipe bathroom sink and mirror",
+      "🧼",
+      0.75,
+      "Tu,Sa"
+    ],
+    [
+      "Help make supper",
+      "🍳",
+      1,
+      "Su,Th"
+    ],
+    [
+      "Clean the basement",
+      "🧹",
+      0.75,
+      "Tu,Sa"
+    ],
+    [
+      "Clean kitchen table and area",
+      "🧽",
+      0.25,
+      "Mo,We,Fr"
+    ],
+    [
+      "Clean and vacuum living room",
+      "🧹",
+      1,
+      "Tu,Fr"
+    ],
+    [
+      "Do laundry and put away",
+      "👕",
+      1,
+      "Mo,Th"
+    ],
+    [
+      "Clean bathroom",
+      "🚽",
+      1.25,
+      "We"
+    ]
+  ],
+  "maximus": [
+    [
+      "Do homework",
+      "✏️",
+      0,
+      "Mo,Tu,We,Th,Fr"
+    ],
+    [
+      "Make bed",
+      "🛏️",
+      0.1,
+      "daily"
+    ],
+    [
+      "Dirty clothes in hamper",
+      "🧺",
+      0.1,
+      "daily"
+    ],
+    [
+      "Wash windows",
+      "🪟",
+      0.6,
+      "Su"
+    ],
+    [
+      "Pick up room",
+      "🧸",
+      1,
+      "Su"
+    ],
+    [
+      "Empty bathroom trash",
+      "🗑️",
+      0.25,
+      "Th"
+    ],
+    [
+      "Empty kitchen trash can",
+      "🗑️",
+      0.25,
+      "Tu"
+    ],
+    [
+      "Do laundry and put away",
+      "👕",
+      0.75,
+      "Tu,Fr"
+    ],
+    [
+      "Vacuum room",
+      "🧹",
+      0.75,
+      "Sa"
+    ],
+    [
+      "Help outside or in the garage",
+      "🚗",
+      0.75,
+      "Sa"
+    ],
+    [
+      "Clean the basement",
+      "🧹",
+      0.5,
+      "Su,Th"
+    ],
+    [
+      "Clean up barstool area",
+      "🪑",
+      0.25,
+      "Tu,Th"
+    ],
+    [
+      "Clean and vacuum living room",
+      "🧹",
+      1,
+      "Su,We"
+    ]
+  ],
+  "emery": [
+    [
+      "Put toys away in the living room",
+      "🧸",
+      0.1,
+      "daily"
+    ],
+    [
+      "Help make bed",
+      "🛏️",
+      0.1,
+      "daily"
+    ],
+    [
+      "Clothes in hamper",
+      "🧺",
+      0.05,
+      "daily"
+    ],
+    [
+      "Plate to the sink",
+      "🍽️",
+      0.05,
+      "Mo,Tu,We,Th,Fr"
+    ],
+    [
+      "Clean bedroom",
+      "🧹",
+      0.75,
+      "Tu,Fr"
+    ],
+    [
+      "Match socks",
+      "🧦",
+      0.25,
+      "Sa"
+    ],
+    [
+      "Water the plants",
+      "🌱",
+      0.25,
+      "Mo"
+    ],
+    [
+      "Clean Barbie Town",
+      "🏠",
+      0.5,
+      "We"
+    ],
+    [
+      "Help clean the basement",
+      "🧹",
+      0.25,
+      "Su,Tu"
+    ]
+  ]
 };
 
 // Replace every kid's chores with the recommended list (runs a few saves at a time)
@@ -502,7 +708,7 @@ function loadPreset() {
 }
 
 function viewChores() {
-  var h = '<button class="btn grn full" data-act="preset" style="margin-bottom:12px">⭐ Load recommended chore list</button>';
+  var h = '<button class="btn grn full" data-act="preset" style="margin-bottom:12px">⭐ Load our chore list</button>';
   S.kids.forEach(function (k) {
     h += '<div class="card" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) +
       '<button class="btn pri" data-act="newChore" data-kid="' + k.id + '">+ Add</button></h2>';
@@ -727,7 +933,7 @@ document.addEventListener('click', function (e) {
     case 'lock': PIN = null; lsSet('chorePin', ''); lsSet('choreState', ''); showPin(); break;
     case 'tvview': openTvView(); break;
     case 'preset':
-      if (confirm('Replace ALL current chores for every kid with the recommended list? Money already earned stays.')) loadPreset();
+      if (confirm('Replace ALL current chores for every kid with our chore list? Money already earned stays.')) loadPreset();
       break;
     case 'close': closeModal(); break;
   }
