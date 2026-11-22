@@ -69,7 +69,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
 .list.week{gap:calc(.4*var(--u))}
 .wrow{display:flex;align-items:center;gap:calc(.6*var(--u));padding:calc(.4*var(--u)) calc(.7*var(--u));border-radius:calc(.8*var(--u));background:#334155;border:calc(.3*var(--u)) solid transparent;width:100%;text-align:left}
 .wrow.full{background:#14532d}
-.wrow.focus{border-color:#fde047;background:#475569;outline:calc(.25*var(--u)) solid var(--c)}
+.wrow.rowcur{border-color:var(--c);background:#475569}
+.wd.fx{cursor:pointer}
+.wd.focus{outline:calc(.3*var(--u)) solid #fde047;outline-offset:calc(.15*var(--u));transform:scale(1.25)}
 .wrow .ic{font-size:calc(1.5*var(--u));width:calc(2*var(--u));text-align:center}
 .wrow .nm{flex:1;min-width:0;font-size:calc(1.1*var(--u));font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wdays{display:flex;gap:calc(.25*var(--u))}
@@ -175,7 +177,7 @@ if (typeof google === 'undefined' && window.Native) {
   window.google = {script: {get run() {
     var s = function () {}, f = function () {};
     var o = {withSuccessHandler: function (x) { s = x; return o; }, withFailureHandler: function (x) { f = x; return o; }};
-    ['getState', 'toggleChore', 'parent'].forEach(function (n) {
+    ['getState', 'toggleChore', 'toggleDay', 'parent'].forEach(function (n) {
       o[n] = function () { var id = 'c' + (++__n); __cbs[id] = {s: s, f: f}; Native.call(id, n, JSON.stringify(Array.prototype.slice.call(arguments))); };
     });
     return o;
@@ -234,24 +236,18 @@ function wk(c) {
     return {occ: occ, cov: cv, legacy: true, doneToday: !!c.done, count: c.done ? 1 : 0};
   }
   var cov = coverage(occ, c.weekDone), doneToday = c.weekDone.indexOf(S.dow) >= 0;
-  // Missed days can only be caught up if there are free days left this week (one check-off per day)
-  var free = 0;
-  for (var d = S.dow; d < 7; d++) if (c.weekDone.indexOf(d) < 0) free++;
-  var needed = occ.filter(function (o) { return o >= S.dow && cov[o] === undefined; }).length;
-  var spare = Math.max(0, free - needed);
   var missed = occ.filter(function (o) { return o < S.dow && cov[o] === undefined; });
-  return {occ: occ, cov: cov, legacy: false, doneToday: doneToday, count: c.weekDone.length,
-    catchable: missed.slice(0, spare), lost: missed.slice(spare)};
+  return {occ: occ, cov: cov, legacy: false, doneToday: doneToday, count: c.weekDone.length, catchable: missed};
 }
 function activeChores(k) { return k.chores.filter(function (c) { return c.active; }); }
 // Today's list: chores due today, plus missed ones that can still be caught up, plus anything done today
 function todayChores(k) {
   return activeChores(k).filter(function (c) {
     var w = wk(c);
-    c.tag = ''; c.locked = false;
+    c.tag = ''; c.locked = false; c.day = S.dow;
     if (c.today) {
       c.done = w.cov[S.dow] !== undefined;
-      if (c.done && !w.doneToday) { c.locked = true; c.tag = 'done early'; }
+      if (c.done && !w.doneToday) c.tag = 'done early';
       return true;
     }
     if (w.legacy) return false;
@@ -259,10 +255,11 @@ function todayChores(k) {
     if (w.doneToday) {
       c.done = true;
       var o = null; for (var key in w.cov) if (w.cov[key] === S.dow) o = +key;
-      c.tag = o !== null && o > S.dow ? 'done early' : 'caught up';
+      if (o === null) return false;
+      c.day = o; c.tag = o > S.dow ? 'done early' : 'caught up';
       return true;
     }
-    if (missed.length) { c.done = false; c.tag = 'catch up · ' + DAYS[missed[0]]; return true; }
+    if (missed.length) { c.done = false; c.day = missed[0]; c.tag = 'catch up · ' + DAYS[missed[0]]; return true; }
     return false;
   });
 }
@@ -284,16 +281,21 @@ function weekStats(k) {
   st.possible = round2(st.possible);
   return st;
 }
-function weekCells(c) {
+function weekCells(c, ci, ri, act) {
   var w = wk(c), h = '';
   for (var d = 0; d < 7; d++) {
     var cls = 'off', mark = '';
     if (w.occ.indexOf(d) >= 0) {
       if (w.cov[d] !== undefined) { cls = 'ok'; mark = '✓'; }
-      else if (d < S.dow) { if (!w.legacy && w.catchable.indexOf(d) >= 0) { cls = 'miss'; mark = '!'; } else { cls = 'gone'; mark = '✕'; } }
+      else if (d < S.dow) { if (!w.legacy) { cls = 'miss'; mark = '!'; } else { cls = 'gone'; mark = '✕'; } }
       else { cls = 'todo'; }
     }
-    h += '<span class="wd ' + cls + (d === S.dow ? ' now' : '') + '">' + mark + '</span>';
+    var attrs = '';
+    if (cls !== 'off' && ci !== undefined) attrs = ' data-c="' + ci + '" data-r="' + ri + '" data-d="' + d + '"';
+    if (cls !== 'off' && act) attrs = ' data-act="pday" data-kid="' + act.kid + '" data-id="' + c.id + '" data-d="' + d + '"';
+    var fx = (cls !== 'off' && ci !== undefined) ? ' fx' : '';
+    var foc = (fx && !tvView && !focus.bar && tvMode === 'week' && focus.c === ci && focus.r === ri && focus.d === d) ? ' focus' : '';
+    h += '<span class="wd ' + cls + fx + foc + (d === S.dow ? ' now' : '') + '"' + attrs + '>' + mark + '</span>';
   }
   return '<span class="wdays">' + h + '</span>';
 }
@@ -301,10 +303,23 @@ function weekHead() {
   return '<div class="whead"><span class="sp"></span><span class="wdays">' + DAY_LETTERS.map(function (l, d) {
     return '<span class="wd' + (d === S.dow ? ' now' : '') + '">' + l + '</span>'; }).join('') + '</span></div>';
 }
-// Check off / undo today, with the weekly rules. Returns false if nothing changed.
-function optimisticToggle(k, c) {
+// Check off / undo one day of the week (default today). Returns false if nothing changed.
+function optimisticToggle(k, c, day) {
   var w = wk(c);
-  if (c.locked) { toast('Already done earlier this week ⭐', true); return false; }
+  if (day === undefined) day = c.day !== undefined ? c.day : S.dow;
+  if (!w.legacy) {
+    if (w.occ.indexOf(day) < 0) return false;
+    var cd = w.cov[day];
+    if (cd !== undefined) {
+      c.weekDone = c.weekDone.filter(function (x) { return x !== cd; });
+      k.pending = round2(k.pending - c.value); if (k.weekEarned != null) k.weekEarned = round2(k.weekEarned - c.value);
+    } else {
+      c.weekDone = c.weekDone.concat([day]).sort(function (a, b) { return a - b; });
+      k.pending = round2(k.pending + c.value); if (k.weekEarned != null) k.weekEarned = round2(k.weekEarned + c.value);
+    }
+    return true;
+  }
+  if (day !== S.dow) { toast('Update the Google script to check off other days'); return false; }
   if (w.legacy) {
     c.done = !c.done; k.pending = round2(k.pending + (c.done ? c.value : -c.value)); return true;
   }
@@ -333,7 +348,7 @@ function renderTV() {
   var html = (tvView ? '<button class="backbtn" data-back="1">← Back to parent</button>' : '') +
     '<header><div><h1>⭐ ' + (week ? 'This Week\'s Chores' : 'Today\'s Chores') + '</h1>' + tabs + '<div class="hint">' +
     (tvView ? 'This is what the kids see on the TV · tap a chore to check it' :
-      (week ? 'Press OK to do a chore today — early ones count for their day' : 'Use ◀ ▶ ▲ ▼ to move · OK to check off · ▲ for This week')) + '</div></div>' +
+      (week ? '◀ ▶ pick a day · OK to check it off · go back to catch up or work ahead' : 'Use ◀ ▶ ▲ ▼ to move · OK to check off · ▲ for This week')) + '</div></div>' +
     '<div class="date">' + DAY_NAMES[d.getDay()] + ', ' + d.toLocaleDateString(undefined, {month: 'long', day: 'numeric'}) + '</div></header><div class="cols">';
   if (week) { el.innerHTML = html + S.kids.map(renderWeekCol).join('') + '</div>'; scrollFocus(el); return; }
   S.kids.forEach(function (k, ci) {
@@ -373,9 +388,9 @@ function renderWeekCol(k, ci) {
   if (!list.length) h += '<div class="empty">No chores yet</div>';
   list.forEach(function (c, ri) {
     var w = wk(c), full = w.count >= w.occ.length && w.occ.length > 0;
-    var f = (!tvView && !focus.bar && focus.c === ci && focus.r === ri) ? ' focus' : '';
-    h += '<button class="wrow fx' + (full ? ' full' : '') + f + '" data-c="' + ci + '" data-r="' + ri + '">' +
-      '<span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '</span>' + weekCells(c) + '</button>';
+    var f = (!tvView && !focus.bar && focus.c === ci && focus.r === ri) ? ' rowcur' : '';
+    h += '<div class="wrow' + (full ? ' full' : '') + f + '" data-row="' + ci + '_' + ri + '">' +
+      '<span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '</span>' + weekCells(c, ci, ri) + '</div>';
   });
   return h + '</div><div class="bank">' +
     '<div class="wk"><small>Earned this week</small><b class="money">' + money(st.earned) + '</b></div>' +
@@ -392,7 +407,8 @@ function bindTvClicks() {
     if (!b) return;
     if (b.dataset.tab) { setTvMode(b.dataset.tab); return; }
     focus.bar = false; focus.c = +b.dataset.c; focus.r = +b.dataset.r;
-    tvToggle(focus.c, focus.r);
+    if (b.dataset.d !== undefined) { focus.d = +b.dataset.d; tvToggle(focus.c, focus.r, focus.d); }
+    else tvToggle(focus.c, focus.r);
   });
   document.getElementById('party').addEventListener('click', closeParty);
 }
@@ -418,13 +434,19 @@ function closeTvView() {
 function clampFocus() {
   if (!S.kids.length) return;
   focus.c = Math.max(0, Math.min(focus.c, S.kids.length - 1));
-  var len = listFor(S.kids[focus.c]).length;
+  var list = listFor(S.kids[focus.c]), len = list.length;
   focus.r = len ? Math.max(0, Math.min(focus.r, len - 1)) : 0;
+  if (tvMode === 'week' && list[focus.r]) {           // land on the nearest day this chore is scheduled
+    if (focus.d === undefined) focus.d = S.dow;
+    var occ = schedDays(list[focus.r].days), best = occ[0];
+    occ.forEach(function (d) { if (Math.abs(d - focus.d) < Math.abs(best - focus.d)) best = d; });
+    focus.d = best;
+  }
 }
 
 function setTvMode(m) {
   if (tvMode === m) return;
-  tvMode = m; focus.r = 0; clampFocus(); renderTV();
+  tvMode = m; focus.r = 0; focus.d = S.dow; clampFocus(); renderTV();
 }
 function moveFocus(dc, dr) {
   if (focus.bar) {                                     // on the Today / This week buttons
@@ -433,6 +455,13 @@ function moveFocus(dc, dr) {
     paintFocus(); return;
   }
   if (dr < 0 && focus.r === 0) { focus.bar = true; focus.b = tvMode === 'week' ? 1 : 0; paintFocus(); return; }
+  if (tvMode === 'week' && dc) {                       // move along this chore's days, then on to the next kid
+    var row = listFor(S.kids[focus.c])[focus.r];
+    var occ = row ? schedDays(row.days) : [];
+    var next = occ.filter(function (d) { return dc > 0 ? d > focus.d : d < focus.d; });
+    if (next.length) { focus.d = dc > 0 ? next[0] : next[next.length - 1]; paintFocus(); return; }
+    focus.d = dc > 0 ? 0 : 6;
+  }
   if (dc) {
     var c = focus.c;
     for (var i = 0; i < S.kids.length; i++) {          // skip kids with nothing to show
@@ -447,27 +476,38 @@ function moveFocus(dc, dr) {
 }
 
 function paintFocus() {
-  var olds = document.querySelectorAll('#tv .fx.focus');
-  for (var i = 0; i < olds.length; i++) olds[i].classList.remove('focus');
+  var olds = document.querySelectorAll('#tv .fx.focus, #tv .rowcur');
+  for (var i = 0; i < olds.length; i++) { olds[i].classList.remove('focus'); olds[i].classList.remove('rowcur'); }
   if (tvView) return;
-  var el = focus.bar ? document.querySelector('#tv .tab[data-i="' + focus.b + '"]')
-    : document.querySelector('#tv .fx[data-c="' + focus.c + '"][data-r="' + focus.r + '"]');
+  var sel = '#tv .fx[data-c="' + focus.c + '"][data-r="' + focus.r + '"]' + (tvMode === 'week' ? '[data-d="' + focus.d + '"]' : '');
+  var el = focus.bar ? document.querySelector('#tv .tab[data-i="' + focus.b + '"]') : document.querySelector(sel);
+  if (el && el.closest && el.closest('.wrow')) el.closest('.wrow').classList.add('rowcur');
   if (el) { el.classList.add('focus'); if (el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); }
 }
 
-function tvToggle(ci, ri) {
+function tvToggle(ci, ri, day) {
   var k = S.kids[ci]; if (!k) return;
   var c = listFor(k)[ri]; if (!c) return;
-  todayChores(k);                                     // refresh lock/tag flags
+  todayChores(k);                                     // refresh day/tag flags
+  if (day === undefined) day = c.day !== undefined ? c.day : S.dow;
   var wasAll = allDone(k);
-  if (!optimisticToggle(k, c)) return;
+  if (!optimisticToggle(k, c, day)) return;
   renderTV();
   if (!wasAll && allDone(k)) celebrate(k);
   pending++;
-  call('toggleChore', k.id, c.id).then(function (st) {
+  saveDay(k, c, day).then(function (st) {
     pending--;
     if (pending === 0) applyState(st);      // newer taps win; only take the server copy once all are saved
   }).catch(function (e) { pending--; toast(errMsg(e)); refresh(true); });
+}
+
+// Save a day's check-off; falls back to today-only if the Google script hasn't been updated yet
+function saveDay(k, c, day, viaParent) {
+  var p = viaParent ? call('parent', PIN, 'toggleDay', {kidId: k.id, choreId: c.id, day: day}) : call('toggleDay', k.id, c.id, day);
+  return p.catch(function (e) {
+    if (!/Unknown/.test(errMsg(e)) || day !== S.dow) throw e;
+    return viaParent ? call('parent', PIN, 'toggle', {kidId: k.id, choreId: c.id}) : call('toggleChore', k.id, c.id);
+  });
 }
 
 function celebrate(k) {
@@ -500,7 +540,8 @@ function tvKeys(e) {
   else if (k === 'ArrowDown' || code === 40) { moveFocus(0, 1); }
   else if (k === 'ArrowUp' || code === 38) { moveFocus(0, -1); }
   else if (k === 'Enter' || k === ' ' || code === 13 || code === 23 || code === 32) {
-    if (focus.bar) { focus.bar = false; focus.r = 0; clampFocus(); paintFocus(); } else tvToggle(focus.c, focus.r);
+    if (focus.bar) { focus.bar = false; focus.r = 0; clampFocus(); paintFocus(); }
+    else tvToggle(focus.c, focus.r, tvMode === 'week' ? focus.d : undefined);
   }
   else return;
   e.preventDefault();
@@ -896,17 +937,17 @@ function loadPreset() {
 
 function viewWeek() {
   var h = '<div class="legend"><span><span class="wd ok">✓</span>done</span><span><span class="wd miss">!</span>missed — can catch up</span>' +
-    '<span><span class="wd todo"></span>still to do</span><span><span class="wd gone">✕</span>missed</span></div>';
+    '<span><span class="wd todo"></span>still to do</span></div><div class="sub" style="margin:-6px 0 12px">Tap any circle to check that day off, or tap again to undo.</div>';
   S.kids.forEach(function (k) {
     var st = weekStats(k);
     h += '<div class="card pw" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) + '<span class="sub">' + st.done + ' of ' + st.total + ' done</span></h2>' +
       '<div class="sub" style="margin:4px 0 8px">Earned ' + money(st.earned) + ' of ' + money(st.possible) + ' this week</div>' + weekHead();
     activeChores(k).forEach(function (c) {
-      h += '<div class="wrow"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '</span>' + weekCells(c) + '</div>';
+      h += '<div class="wrow"><span class="ic">' + esc(c.icon) + '</span><span class="nm">' + esc(c.name) + '</span>' + weekCells(c, undefined, undefined, {kid: k.id}) + '</div>';
     });
     h += '</div>';
   });
-  return h + '<div class="sub">The week runs Sunday to Saturday. A chore done early counts for its day. A missed chore can be caught up on a free day before Saturday — daily chores can’t, since they’re already on every day.</div>';
+  return h + '<div class="sub">The week runs Sunday to Saturday. Circles only show on the days each chore is scheduled. Missed days can be checked off later in the week, and future days can be done early.</div>';
 }
 
 function viewChores() {
@@ -1060,14 +1101,17 @@ document.addEventListener('click', function (e) {
     case 'spend': case 'add': case 'move': moneyModal(a, kid); break;
     case 'doMoney': doMoney(t.dataset.kind, kid); break;
     case 'today': todayModal(kid); break;
+    case 'pday':
     case 'ptoggle':
       var pk = kidById(kid), pc = pk.chores.filter(function (x) { return x.id === id; })[0];
       if (!pc) break;
       todayChores(pk);
-      if (!optimisticToggle(pk, pc)) break;
-      todayModal(kid); renderParent(); cacheState();
+      var pday = t.dataset.d !== undefined ? +t.dataset.d : pc.day;
+      if (!optimisticToggle(pk, pc, pday)) break;
+      if (t.dataset.d === undefined) todayModal(kid);
+      renderParent(); cacheState();
       pending++;
-      call('parent', PIN, 'toggle', {kidId: kid, choreId: id}).then(function (st) {
+      saveDay(pk, pc, pday, true).then(function (st) {
         pending--; if (pending === 0) { lastJson = ''; applyState(st); cacheState(); if (document.getElementById('modal').className !== 'hidden') todayModal(kid); }
       }).catch(function (err) { pending--; serverFail(err); });
       break;
