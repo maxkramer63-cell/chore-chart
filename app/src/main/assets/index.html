@@ -751,6 +751,11 @@ function renderParent() {
 
 function viewKids() {
   var h = '';
+  if (lsGet('presetLoaded') !== PRESET_VERSION) {
+    h += '<div class="card" style="--c:#f59e0b"><h2>📋 Your chore list is ready</h2>' +
+      '<div class="sub" style="margin:6px 0 12px">Load the chores from your spreadsheet (Addison 13, Maximus 13, Emery 9). This replaces the chores in the app; money already earned stays.</div>' +
+      '<div class="btns"><button class="btn grn" data-act="preset" style="flex:2">Load my chore list</button><button class="btn" data-act="presetSkip" style="flex:1">Not now</button></div></div>';
+  }
   S.kids.forEach(function (k) {
     var t = todayChores(k), n = t.filter(function (c) { return c.done; }).length;
     h += '<div class="card" style="--c:' + esc(k.color) + '"><h2>' + esc(k.name) + (allDone(k) ? ' <span>🎉 ⭐</span>' : '') +
@@ -770,6 +775,7 @@ function viewKids() {
   return h;
 }
 
+var PRESET_VERSION = 'sheet-2026-11-22';
 var PRESET = {
   "addison": [
     [
@@ -1007,7 +1013,7 @@ function loadPreset() {
   renderParent(); cacheState();
   var total = jobs.length, doneCount = 0, failed = 0, last = null;
   pending++;
-  toast('Saving chores… 0 of ' + total, true);
+  toast('Saving chores…', true);
   // deletes first, then adds, 4 at a time
   var deletes = jobs.filter(function (j) { return j[0] === 'deleteChore'; });
   var adds = jobs.filter(function (j) { return j[0] === 'saveChore'; });
@@ -1026,11 +1032,22 @@ function loadPreset() {
       next();
     });
   }
+  // Newer Google script: one call does it all. Older one: fall back to one chore at a time.
+  var all = adds.map(function (j) { return {kidId: j[1].kidId, name: j[1].name, icon: j[1].icon, value: j[1].value, days: j[1].days}; });
+  call('parent', PIN, 'replaceChores', {chores: all}).then(function (st) {
+    pending--; toast('All chores loaded ⭐', true); lsSet('presetLoaded', PRESET_VERSION);
+    lastJson = ''; applyState(st); cacheState();
+  }).catch(function (e) {
+    if (!/Unknown/.test(errMsg(e))) { pending--; serverFail(e); return; }
+    slowLoad();
+  });
+  function slowLoad() {
   runBatch(deletes).then(function () { return runBatch(adds); }).then(function () {
     pending--;
-    if (failed) toast(failed + ' chore changes didn’t save — tap the button again'); else toast('All chores loaded ⭐', true);
+    if (failed) toast(failed + ' chore changes didn’t save — tap the button again'); else { toast('All chores loaded ⭐', true); lsSet('presetLoaded', PRESET_VERSION); }
     lastJson = ''; refresh(true);
   });
+  }
 }
 
 function viewWeek() {
@@ -1298,6 +1315,7 @@ document.addEventListener('click', function (e) {
       break;
     case 'lock': PIN = null; lsSet('chorePin', ''); lsSet('choreState', ''); showPin(); break;
     case 'tvview': openTvView(); break;
+    case 'presetSkip': lsSet('presetLoaded', PRESET_VERSION); renderParent(); break;
     case 'preset':
       if (confirm('Replace ALL current chores for every kid with our chore list? Money already earned stays.')) loadPreset();
       break;
